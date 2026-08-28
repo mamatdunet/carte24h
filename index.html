@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=10, viewport-fit=cover">
+<title>Circuit de la Sarthe — Carte Historique Interactive des 24 Heures du Mans</title>
+<meta name="description" content="Carte interactive historique du Circuit des 24 Heures du Mans : 71 événements marquants (records, victoires, accidents, moto, GP Explorer), vue 3D immersive et vue satellite IGN.">
+<meta name="keywords" content="Le Mans, 24 Heures du Mans, Circuit de la Sarthe, carte historique, Mulsanne, Hunaudières, Ferrari, Porsche, Audi, MotoGP, GP Explorer">
+<meta name="author" content="Carte 24h Le Mans">
+<meta name="theme-color" content="#0a0c10">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://carte24h.vercel.app/">
+<meta property="og:title" content="Circuit de la Sarthe — Carte Historique des 24H du Mans">
+<meta property="og:description" content="Explorez 100 ans d'histoire des 24 Heures du Mans : 71 événements, vue 3D immersive, carte satellite IGN.">
+<meta property="og:image" content="https://carte24h.vercel.app/og-image.svg">
+<meta property="og:locale" content="fr_FR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Circuit de la Sarthe — Carte Historique des 24H du Mans">
+<meta name="twitter:description" content="Explorez 100 ans d'histoire des 24 Heures du Mans : 71 événements, vue 3D immersive, carte satellite IGN.">
+<meta name="twitter:image" content="https://carte24h.vercel.app/og-image.svg">
+<!-- Favicon: stylized golden circuit on dark background -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0c10'/%3E%3Cpath d='M20 12 C 10 12 8 22 14 32 C 18 40 14 48 22 52 C 30 56 38 52 44 44 C 52 34 56 22 48 14 C 42 8 30 10 20 12 Z' fill='none' stroke='%23c8a94e' stroke-width='3' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='30' r='2' fill='%23c8a94e'/%3E%3Ccircle cx='40' cy='40' r='2' fill='%23e85040'/%3E%3Ccircle cx='44' cy='20' r='2' fill='%2350b860'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:#0a0c10;color:#e8e4dc;font-family:'Source Sans 3',sans-serif}
+#app{display:flex;height:100vh;position:relative}
+#map-area{flex:1;position:relative;overflow:hidden;cursor:grab}
+#map-area.dragging{cursor:grabbing}
+#sat-map{position:absolute;inset:0;z-index:2;background:#0a0c10}
+/* Rendu sombre du fond OpenStreetMap (le calque satellite IGN n'est pas affecte) */
+#sat-map .osm-dark{filter:grayscale(1) invert(1) brightness(0.55) contrast(1.25)}
+#sat-map .leaflet-control-attribution a{color:#c8a94e}
+
+#sat-map .leaflet-control-attribution{font-size:8px;opacity:0.5;margin-bottom:110px !important}
+#sat-map .leaflet-bottom.leaflet-right{bottom:120px}
+#sat-map .leaflet-control-zoom{box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+@media(max-width:768px){
+  #sat-map .leaflet-control-attribution{margin-bottom:90px !important}
+  #sat-map .leaflet-bottom.leaflet-right{bottom:100px}
+}
+.leaflet-tooltip.ev-tooltip{background:rgba(14,16,22,0.95);border:1px solid rgba(200,169,78,0.4);color:#f4e09c;font-family:'Oswald',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;padding:6px 12px;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,0.6);backdrop-filter:blur(8px);white-space:nowrap}
+.leaflet-tooltip.ev-tooltip::before{border-top-color:rgba(200,169,78,0.4)}
+#btn-sat{position:fixed;top:16px;right:160px;z-index:9998;padding:8px 16px;border-radius:20px;border:1px solid rgba(200,169,78,0.3);background:rgba(10,12,16,0.85);color:#c8a94e;cursor:pointer;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.3s;backdrop-filter:blur(8px)}
+#btn-sat:hover,#btn-sat.active{background:rgba(200,169,78,0.2);border-color:#c8a94e;box-shadow:0 0 12px rgba(200,169,78,0.15)}
+
+#title-bar{position:absolute;top:0;left:0;right:0;padding:18px 28px;background:linear-gradient(180deg,rgba(10,12,16,0.92) 0%,rgba(10,12,16,0.6) 70%,transparent 100%);z-index:10;pointer-events:none}
+#title-bar h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(18px,2.5vw,32px);letter-spacing:0.12em;text-transform:uppercase;background:linear-gradient(90deg,#c8a94e,#f4e09c,#c8a94e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#title-bar .sub{font-size:clamp(11px,1.2vw,15px);color:#8a857a;letter-spacing:0.05em;margin-top:2px}
+
+
+#search-box{position:absolute;top:100px;left:20px;z-index:11;display:flex;align-items:center;gap:8px;background:rgba(10,12,16,0.9);border:1px solid rgba(200,169,78,0.3);border-radius:22px;padding:8px 14px;backdrop-filter:blur(8px);width:300px;max-width:calc(100vw - 40px);transition:border-color 0.2s,box-shadow 0.2s}
+#search-box:focus-within{border-color:#c8a94e;box-shadow:0 0 14px rgba(200,169,78,0.2)}
+#search-box svg{color:#c8a94e;opacity:0.6;flex-shrink:0}
+#search-input{flex:1;background:transparent;border:none;outline:none;color:#f4e09c;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:0.04em;min-width:0}
+#search-input::placeholder{color:#6a6560;text-transform:none}
+#search-clear{background:transparent;border:none;color:#6a6560;cursor:pointer;font-size:14px;display:none;padding:0;width:20px;height:20px;align-items:center;justify-content:center}
+#search-box.has-value #search-clear{display:flex}
+#search-clear:hover{color:#c8a94e}
+#filters{position:absolute;top:150px;left:20px;display:flex;flex-wrap:wrap;gap:8px;z-index:10;max-width:400px}
+#timeline-wrap{position:fixed;bottom:0;left:0;right:0;height:110px;z-index:15;pointer-events:none}
+#timeline{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,12,16,0.85) 0%,rgba(10,12,16,0.98) 50%);border-top:1px solid rgba(200,169,78,0.2);backdrop-filter:blur(8px);overflow-x:auto;overflow-y:visible;padding:54px 80px 18px;scrollbar-width:thin;scrollbar-color:rgba(200,169,78,0.4) transparent;pointer-events:auto}
+#timeline::-webkit-scrollbar{height:6px}
+#timeline::-webkit-scrollbar-thumb{background:rgba(200,169,78,0.5);border-radius:3px}
+#timeline::-webkit-scrollbar-track{background:rgba(200,169,78,0.08)}
+#timeline-inner{position:relative;height:24px;min-width:100%}
+#timeline-line{position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(200,169,78,0.2)}
+.tl-arrow{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;background:linear-gradient(90deg,rgba(10,12,16,0.95),rgba(10,12,16,0.4));border:none;color:#c8a94e;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;z-index:16;transition:color 0.2s,background 0.2s;pointer-events:auto}
+.tl-arrow:hover{color:#f4e09c;background:linear-gradient(90deg,rgba(10,12,16,0.95),rgba(200,169,78,0.15))}
+.tl-arrow.tl-arrow-right{right:0;transform:translateY(-50%) rotate(180deg)}
+.tl-arrow.tl-arrow-left{left:0}
+.tl-arrow svg{width:26px;height:26px}
+.tl-item{position:absolute;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;border:2px solid #0a0c10;cursor:pointer;transition:transform 0.2s,opacity 0.2s,box-shadow 0.2s;box-shadow:0 0 0 2px rgba(10,12,16,0.5)}
+.tl-item:hover{transform:translate(-50%,-50%) scale(1.5);box-shadow:0 0 12px currentColor,0 0 0 2px rgba(10,12,16,0.5);z-index:5}
+.tl-item.active{transform:translate(-50%,-50%) scale(1.7);box-shadow:0 0 16px currentColor,0 0 0 2px rgba(10,12,16,0.5);border-color:#fff;z-index:6}
+.tl-item.dimmed{opacity:0.15}
+.tl-year{position:absolute;top:-26px;left:50%;transform:translateX(-50%);font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;color:#8a857a;letter-spacing:0.08em;pointer-events:none;white-space:nowrap}
+.tl-item:hover .tl-year,.tl-item.active .tl-year{color:#c8a94e}
+.tl-tooltip{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);padding:7px 14px;background:rgba(14,16,22,0.97);border:1px solid rgba(200,169,78,0.5);border-radius:6px;color:#f4e09c;font-family:'Oswald',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.04em;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.2s;text-transform:uppercase;box-shadow:0 4px 12px rgba(0,0,0,0.5);z-index:10}
+.tl-item:hover .tl-tooltip{opacity:1}
+#info-panel{bottom:110px}
+@media(max-width:768px){
+  /* Timeline hidden on mobile */
+  #timeline-wrap{display:none !important}
+  #info-panel{bottom:0}
+}
+.filter-btn{padding:9px 16px;border-radius:22px;border:1px solid rgba(200,169,78,0.3);background:rgba(10,12,16,0.88);color:#c8a94e;cursor:pointer;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;transition:all 0.3s;backdrop-filter:blur(8px);white-space:nowrap}
+.filter-btn:hover{background:rgba(200,169,78,0.15);border-color:rgba(200,169,78,0.5)}
+.filter-btn.active{background:rgba(200,169,78,0.25);border-color:#c8a94e;box-shadow:0 0 14px rgba(200,169,78,0.2);color:#f4e09c}
+.filter-btn .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
+
+#info-panel{position:absolute;top:0;right:0;bottom:0;width:55vw;min-width:380px;max-width:720px;background:rgba(14,16,22,0.97);border-left:1px solid rgba(200,169,78,0.2);backdrop-filter:blur(20px);padding:0;z-index:20;transform:translateX(100%);pointer-events:none;transition:transform 0.45s cubic-bezier(.22,1,.36,1);overflow:hidden;display:flex;flex-direction:column}
+#info-panel.visible{transform:translateX(0);pointer-events:auto}
+.panel-header{padding:22px 28px;border-bottom:1px solid rgba(200,169,78,0.15);position:relative;flex-shrink:0}
+.panel-header h3{font-family:'Oswald',sans-serif;font-size:24px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding-right:40px}
+.panel-cat{font-size:16px;text-transform:uppercase;letter-spacing:0.1em;margin-top:8px;font-weight:700}
+.panel-body{padding:22px 28px;font-size:15px;line-height:1.75;color:#b0ab9f;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.panel-body strong{color:#e8e4dc}
+.panel-close{position:absolute;top:16px;right:20px;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,0.08);color:#8a857a;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.panel-close:hover{background:rgba(255,255,255,0.15);color:#e8e4dc}
+.panel-close-mobile{display:none}
+
+.panel-img{margin:12px 0;border-radius:8px;overflow:hidden}
+.panel-img img{width:100%;height:auto;display:block;border-radius:8px;opacity:0.9;transition:opacity 0.3s}
+.panel-img img:hover{opacity:1}
+.panel-header-icon{display:flex;align-items:center;justify-content:center;height:60px;margin:-16px -20px 14px;border-radius:8px 8px 0 0;position:relative;overflow:hidden}
+.panel-header-icon svg{height:36px;width:36px;opacity:0.7}
+.panel-header-icon::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(10,12,16,1))}
+.media-carousel{position:relative;margin:12px 0;border-radius:8px;overflow:hidden}
+.media-carousel .slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;gap:0}
+.media-carousel .slides::-webkit-scrollbar{display:none}
+.media-carousel .slide{flex:0 0 100%;scroll-snap-align:start;min-width:100%}
+.media-carousel .slide img{width:100%;height:320px;object-fit:cover;display:block;border-radius:8px}
+.media-carousel .slide iframe{width:100%;height:320px;border:none;border-radius:8px;display:block}
+.media-carousel .slide .yt-placeholder,.panel-img .yt-placeholder{position:relative;width:100%;cursor:pointer;border-radius:8px;overflow:hidden;background:#000}
+.media-carousel .slide .yt-placeholder img,.panel-img .yt-placeholder img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity 0.3s}
+.yt-placeholder:hover img{opacity:0.7}
+.yt-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;height:48px;pointer-events:none;opacity:0.85;transition:opacity 0.2s,transform 0.2s}
+.yt-placeholder:hover .yt-play-btn{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+.media-carousel .dots{display:flex;justify-content:center;gap:6px;padding:8px 0 2px}
+.media-carousel .dot-ind{width:6px;height:6px;border-radius:50%;background:rgba(200,169,78,0.3);cursor:pointer;transition:all 0.2s}
+.media-carousel .dot-ind.active{background:#c8a94e;transform:scale(1.3)}
+.panel-link{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 14px;border-radius:6px;background:rgba(200,169,78,0.1);border:1px solid rgba(200,169,78,0.25);color:#c8a94e;text-decoration:none;font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.3s}
+.panel-link:hover{background:rgba(200,169,78,0.2);border-color:#c8a94e}
+
+
+
+
+@media(max-width:768px){
+  #info-panel{top:auto;bottom:0;right:0;left:0;width:100%;min-width:0;max-width:100%;max-height:78vh;transform:translateY(100%);border-left:none;border-top:1px solid rgba(200,169,78,0.25);border-radius:16px 16px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #info-panel.visible{transform:translateY(0)}
+  #info-panel .panel-body{max-height:none;overflow-y:auto;padding-bottom:8px}
+  #info-panel .panel-header{padding:16px 20px;padding-right:50px}
+  #info-panel .panel-header h3{font-size:18px}
+  #info-panel .panel-close{display:flex}
+  /* Hide the extra mobile close button (header close is enough) */
+  .panel-close-mobile{display:none !important}
+  #search-box{top:64px;left:10px;right:10px;width:auto;max-width:none}
+  #filters{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);left:0;right:0;max-width:100%;padding:6px 10px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:rgba(10,12,16,0.88);backdrop-filter:blur(8px);border-top:1px solid rgba(200,169,78,0.15)}
+  #filters::-webkit-scrollbar{display:none}
+  .filter-btn{font-size:10px;padding:5px 10px;flex-shrink:0}
+  #title-bar{padding:10px 16px;padding-right:180px}
+  #title-bar h1{font-size:16px}
+  #title-bar .sub{font-size:10px}
+  #btn3d{top:8px;right:8px;font-size:10px;padding:6px 10px}
+  #btn-sat{top:8px;right:96px;font-size:9px;padding:6px 10px}
+  .media-carousel .slide img,.media-carousel .slide iframe{height:200px}
+  #hud3d .event-card .panel-img img,#hud3d .card3d-body .media-carousel .slide img,
+  #hud3d .card3d-body .panel-img iframe,#hud3d .card3d-body .media-carousel .slide iframe,
+  #hud3d .card3d-body .yt-placeholder{height:160px !important}
+}
+#app::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:0.5}
+
+/* 3D Mode */
+#view3d{position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:none;background:#050608;overflow:hidden}
+#view3d.active{display:block}
+#view3d canvas{display:block}
+#btn3d{position:fixed;top:16px;right:20px;z-index:9998;padding:8px 18px;border-radius:20px;border:1px solid rgba(200,169,78,0.4);background:rgba(10,12,16,0.9);color:#c8a94e;cursor:pointer;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.3s;backdrop-filter:blur(8px)}
+#btn3d:hover,#btn3d.active{background:rgba(200,169,78,0.25);border-color:#c8a94e;box-shadow:0 0 16px rgba(200,169,78,0.2)}
+#hud3d{position:fixed;bottom:0;left:0;right:0;z-index:10000;pointer-events:none;display:none;padding:20px}
+#hud3d.active{display:flex;flex-direction:column;align-items:center}
+#hud3d .event-card{pointer-events:auto;max-width:640px;width:100%;background:rgba(10,12,16,0.94);border:1px solid rgba(200,169,78,0.25);border-radius:12px;padding:20px 24px;backdrop-filter:blur(12px);transform:translateY(20px);opacity:0;transition:all 0.5s cubic-bezier(.22,1,.36,1);max-height:60vh;display:flex;flex-direction:column}
+#hud3d .event-card.show{transform:translateY(0);opacity:1}
+#hud3d .event-card h3{font-family:'Oswald',sans-serif;font-size:20px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;flex-shrink:0}
+#hud3d .card3d-body{font-size:14px;line-height:1.6;color:#b0ab9f;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+#hud3d .card3d-body strong{color:#e8e4dc}
+#hud3d .card3d-body .panel-img,#hud3d .card3d-body .media-carousel{margin:10px 0}
+#hud3d .card3d-body .panel-img img,#hud3d .card3d-body .media-carousel .slide img{width:100%;height:220px;object-fit:cover;display:block;border-radius:8px}
+#hud3d .card3d-body .panel-img iframe,#hud3d .card3d-body .media-carousel .slide iframe{width:100%;height:220px;border:none;border-radius:8px}
+#hud3d .card3d-body .yt-placeholder{height:220px !important}
+#hud3d .card3d-body .panel-link{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 14px;border-radius:6px;background:rgba(200,169,78,0.1);border:1px solid rgba(200,169,78,0.25);color:#c8a94e;text-decoration:none;font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:0.08em;text-transform:uppercase}
+#hud3d .card3d-body .panel-link:hover{background:rgba(200,169,78,0.2);border-color:#c8a94e}
+#hud3d .event-card .cat-badge{display:inline-block;font-size:14px;text-transform:uppercase;letter-spacing:0.1em;padding:4px 14px;border-radius:12px;margin-bottom:10px;font-weight:700;flex-shrink:0}
+#hud3d .nav-hint{color:#6a6560;font-size:12px;font-family:'Oswald',sans-serif;letter-spacing:0.15em;text-transform:uppercase;margin-top:14px;pointer-events:auto;cursor:pointer;transition:color 0.3s;animation:hintPulse 2s ease-in-out infinite}
+#hud3d .nav-hint:hover{color:#c8a94e}
+@keyframes hintPulse{0%,100%{opacity:0.5}50%{opacity:1}}
+#hud3d .progress-bar{width:100%;max-width:520px;height:2px;background:rgba(200,169,78,0.1);border-radius:1px;margin-bottom:14px;pointer-events:none}
+#hud3d .progress-fill{height:100%;background:#c8a94e;border-radius:1px;transition:width 0.8s ease}
+#speed-display{position:fixed;top:16px;left:20px;z-index:10000;display:none;font-family:'Oswald',sans-serif}
+#nav3d-buttons{display:flex;gap:16px;align-items:center;margin-bottom:12px;pointer-events:auto}
+#nav3d-buttons button{width:48px;height:48px;border-radius:50%;border:2px solid rgba(200,169,78,0.5);background:rgba(10,12,16,0.85);color:#c8a94e;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all 0.3s;backdrop-filter:blur(8px)}
+#nav3d-buttons button.play-btn{width:64px;height:64px;font-size:28px;background:rgba(200,169,78,0.2);border-color:#c8a94e;color:#f4e09c;box-shadow:0 0 16px rgba(200,169,78,0.3)}
+#nav3d-buttons button.play-btn:hover{background:rgba(200,169,78,0.35);box-shadow:0 0 24px rgba(200,169,78,0.5)}
+#nav3d-buttons .play-group{display:flex;flex-direction:column;align-items:center;gap:4px}
+#nav3d-buttons .play-label{font-family:'Oswald',sans-serif;font-size:9px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:rgba(200,169,78,0.7);pointer-events:none;white-space:nowrap}
+#nav3d-buttons button#btn-mode3d{width:auto;border-radius:24px}
+#nav3d-buttons button#btn-speed3d{width:auto;border-radius:24px}
+#nav3d-buttons button:hover{background:rgba(200,169,78,0.25);border-color:#c8a94e;box-shadow:0 0 20px rgba(200,169,78,0.3)}
+#nav3d-buttons button:disabled{opacity:0.3;cursor:default;box-shadow:none}
+#nav3d-buttons .nav-counter{color:rgba(200,169,78,0.6);font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:0.1em;min-width:60px;text-align:center}
+#btn-back3d{position:fixed;top:16px;right:20px;z-index:10001;padding:10px 20px;border-radius:20px;border:1px solid rgba(200,169,78,0.4);background:rgba(10,12,16,0.9);color:#c8a94e;cursor:pointer;font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;transition:all 0.3s;backdrop-filter:blur(8px);display:none}
+#btn-back3d.active{display:block}
+#btn-back3d:hover{background:rgba(200,169,78,0.25);border-color:#c8a94e;box-shadow:0 0 16px rgba(200,169,78,0.2)}
+#speed-display.active{display:block}
+#speed-display .speed-val{font-size:48px;font-weight:700;color:#c8a94e;line-height:1}
+#speed-display .speed-unit{font-size:14px;color:#6a6560;letter-spacing:0.1em}
+#speed-display .corner-name{font-size:13px;color:#8a857a;margin-top:4px;letter-spacing:0.05em;text-transform:uppercase}
+@media(max-width:768px){
+  #hud3d{padding:10px 8px 14px}
+  #nav3d-buttons{flex-wrap:wrap;justify-content:center;gap:6px;max-width:100%}
+  #nav3d-buttons button{width:40px;height:40px;font-size:16px;border-width:1.5px}
+  #nav3d-buttons button.play-btn{width:52px;height:52px;font-size:22px}
+  #nav3d-buttons button#btn-mode3d{min-width:80px !important;font-size:10px !important;height:36px;padding:0 10px !important}
+  #nav3d-buttons button#btn-speed3d{min-width:44px !important;font-size:11px !important;height:36px}
+  #nav3d-buttons .nav-counter{font-size:11px;min-width:44px}
+  #nav3d-buttons .play-label{font-size:8px}
+  #nav3d-buttons>div[style*="width:20px"]{width:6px !important}
+  #hud3d .event-card{max-width:calc(100vw - 16px);padding:14px 16px;max-height:52vh;font-size:13px}
+  #hud3d .event-card h3{font-size:16px}
+  #hud3d .event-card .cat-badge{font-size:11px;padding:3px 10px}
+  #hud3d .progress-bar{max-width:calc(100vw - 16px)}
+  #btn-back3d{top:10px;right:10px;font-size:11px;padding:6px 12px}
+  #speed-display{top:10px;left:10px}
+  #speed-display .speed-val{font-size:36px}
+  #speed-display .speed-unit{font-size:11px}
+  #speed-display .corner-name{font-size:11px}
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map-area">
+    <div id="sat-map"></div>
+    
+
+    <div id="title-bar">
+      <h1>Circuit de la Sarthe</h1>
+      <div class="sub">Les 24 Heures du Mans — Carte historique des événements</div>
+    </div>
+
+
+
+    <div id="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="search-input" type="text" placeholder="Rechercher (touche /)" autocomplete="off" spellcheck="false">
+      <button id="search-clear" type="button" aria-label="Effacer">✕</button>
+    </div>
+    <div id="filters">
+      <button class="filter-btn active" data-filter="all"><span class="dot" style="background:#fff"></span>Tous</button>
+      <button class="filter-btn" data-filter="death"><span class="dot" style="background:#e85040"></span>Décès</button>
+      <button class="filter-btn" data-filter="accident"><span class="dot" style="background:#e8a040"></span>Accidents</button>
+      <button class="filter-btn" data-filter="record"><span class="dot" style="background:#c8a94e"></span>Records</button>
+      <button class="filter-btn" data-filter="victoire"><span class="dot" style="background:#50b860"></span>Victoires</button>
+      <button class="filter-btn" data-filter="moto"><span class="dot" style="background:#40c8d8"></span>Moto</button>
+      <button class="filter-btn" data-filter="gpexplorer"><span class="dot" style="background:#d850a0"></span>GP Explorer</button>
+      <button class="filter-btn" data-filter="insolite"><span class="dot" style="background:#80c850"></span>Insolite</button>
+      <button class="filter-btn" data-filter="landmark"><span class="dot" style="background:#4a9fd4"></span>Lieux</button>
+      <button class="filter-btn" data-filter="memorial"><span class="dot" style="background:#9b6fc0"></span>Mémorial</button>
+    </div>
+
+  </div>
+
+  <div id="info-panel">
+    <div class="panel-header">
+      <h3 id="panel-title"></h3>
+      <div class="panel-cat" id="panel-cat"></div>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+  </div>
+  <button class="panel-close-mobile" id="panel-close-mobile" onclick="closePanel()">✕</button>
+
+  <div id="timeline-wrap">
+    <button class="tl-arrow tl-arrow-left" id="tl-scroll-left" aria-label="Défiler à gauche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div id="timeline"></div>
+    <button class="tl-arrow tl-arrow-right" id="tl-scroll-right" aria-label="Défiler à droite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+  </div>
+</div>
+
+<button id="btn3d" onclick="toggle3D()">Vue 3D</button>
+<button id="btn-sat" onclick="toggleSat()">Vue satellite</button>
+<div id="view3d"></div>
+<div id="hud3d">
+  <div class="progress-bar"><div class="progress-fill" id="progress3d" style="width:0%"></div></div>
+  <div id="nav3d-buttons">
+    <button id="btn-mode3d" onclick="toggleTourMode3D()" title="Mode du tour (circuit / anecdotes)" style="min-width:96px;font-size:11px;padding:0 10px">CIRCUIT</button>
+    <button id="btn-prev3d" onclick="stopAutoTour3D(); prev3D()" title="Précédent">◀</button>
+    <span class="nav-counter" id="nav-counter3d">1 / 33</span>
+    <button id="btn-next3d" onclick="advance3D()" title="Suivant">▶</button>
+    <div style="width:20px"></div>
+    <div class="play-group">
+      <button id="btn-play3d" class="play-btn" onclick="toggleAutoTour3D()" title="Navigation automatique">⏵</button>
+      <span class="play-label">Navigation auto</span>
+    </div>
+    <button id="btn-speed3d" onclick="cycleAutoSpeed3D()" title="Vitesse du tour" style="min-width:52px;font-size:13px">1×</button>
+  </div>
+  <div class="event-card" id="card3d">
+    <div class="cat-badge" id="badge3d"></div>
+    <h3 id="title3d"></h3>
+    <div id="body3d" class="card3d-body"></div>
+  </div>
+</div>
+<div id="btn-back3d" onclick="toggle3D()">← Carte 2D</div>
+<div id="speed-display">
+  <div class="speed-val" id="speed-val">0</div>
+  <div class="speed-unit">KM/H</div>
+  <div class="corner-name" id="corner-name"></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" async></script>
+<script>
+
+const EVENTS = [
+  {id:'premiere1923',title:'Première édition — 1923',category:'record',color:'#c8a94e',x:395.1,y:939.1,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Chenard_et_Walcker_Tank.jpg?width=400',link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1923',body:'<b>26-27 mai 1923</b> — 33 équipages au départ. Victoire Lagache & Léonard (Chenard & Walcker), 2 209 km à 92 km/h de moyenne.'},
+  {id:'bentley1924',title:'Première victoire Bentley',category:'victoire',color:'#50b860',x:477.9,y:883.7,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1924#À_noter',body:'<b>1924</b> — Duff & Clement remportent la 1ère des 5 victoires Bentley. Les "Bentley Boys" deviennent légendaires.'},
+  {id:'departLM',title:'Invention du départ Le Mans',category:'record',color:'#c8a94e',x:454.8,y:896.9,img:'https://commons.wikimedia.org/wiki/Special:FilePath/LeMansStart1963.jpg?width=400',link:'https://en.wikipedia.org/wiki/Le_Mans_start',body:'<b>1925</b> — Sprint des pilotes à travers la piste pour rejoindre leur voiture. Porsche place le contact à gauche sur ses modèles de série pour gagner des dixièmes.'},
+  {id:'crash1927',title:'Crash White House — Bentley n°7',category:'accident',color:'#e8a040',x:800,y:785,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1927#Course',body:'<b>1927</b> — Carambolage de 3 Bentley à Maison Blanche. Sammy Davis répare seul sa n°7, reprend la course et gagne avec 20 tours d\'avance.'},
+  {id:'rosier1950',title:'Louis Rosier — 23h30 au volant',category:'record',color:'#c8a94e',x:530,y:900,img:null,link:'https://fr.wikipedia.org/wiki/Louis_Rosier#Biographie',body:'<b>1950</b> — Rosier pilote 23h30 sur 24h. Un hibou brise le pare-brise et le blesse à l\'œil. Seule victoire père-fils de l\'histoire.'},
+  {id:'levegh1952',title:'Levegh — marathon brisé',category:'record',color:'#c8a94e',x:551.3,y:377.5,img:null,link:'https://fr.wikipedia.org/wiki/Pierre_Levegh#Le_Mans_1952',body:'<b>1952</b> — Levegh refuse de céder le volant pendant 22h50. En tête de 4 tours, il casse une bielle à 1h10 de l\'arrivée.'},
+  {id:'jaguar1953',title:'Jaguar C-Type — freins à disque',category:'victoire',color:'#50b860',x:1234,y:50,img:null,link:'https://en.wikipedia.org/wiki/1953_24_Hours_of_Le_Mans',body:'<b>1953</b> — Jaguar équipe ses C-Type de freins à disque Dunlop, innovation venue de l\'aviation. Premier vainqueur à dépasser 4 000 km.'},
+  {id:'catastrophe1955',title:'Catastrophe de 1955',category:'death',color:'#e85040',x:400.9,y:886.5,img:'https://commons.wikimedia.org/wiki/Special:FilePath/1955_Le_Mans_disaster.jpg?width=400',link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1955#Les_circonstances_de_course',body:'<b>11 juin 1955, 18h26</b> — La Mercedes 300 SLR de Pierre Levegh explose dans les tribunes. <b>82+ morts</b>, 120+ blessés. Pire accident du sport auto.'},
+  {id:'memorial1955',title:'Plaque commémorative 1955',category:'memorial',color:'#9b6fc0',x:415.6,y:920.3,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1955#Les_conséquences_du_drame',body:'<b>Mémorial</b> — Plaque en marge du tracé honorant les 82 victimes de 1955. Rappel permanent du prix humain de la compétition.'},
+  {id:'ferrari60_65',title:'Domination Ferrari 1960-65',category:'victoire',color:'#50b860',x:446.7,y:865.6,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans#Palmarès',body:'<b>1960-1965</b> — Six victoires consécutives de Ferrari, record inégalé. Cette hégémonie provoque la guerre Ford vs Ferrari.'},
+  {id:'ford1966',title:'Ford vs Ferrari — photo finish',category:'victoire',color:'#50b860',x:409.3,y:963.5,img:'https://commons.wikimedia.org/wiki/Special:FilePath/1966FordGT40MkII.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Ford_GT40#Victoires_au_Mans',body:'<b>1966</b> — Triplé GT40. Ken Miles perd la victoire par la règle de la distance, malgré 4 tours d\'avance. Film "Le Mans \'66" (2019).'},
+  {id:'gurney1967',title:'Record 5 000 km — champagne',category:'record',color:'#c8a94e',x:591.2,y:312.9,img:null,link:'https://en.wikipedia.org/wiki/1967_24_Hours_of_Le_Mans',body:'<b>1967</b> — Gurney & Foyt couvrent 5 232 km. Gurney invente la tradition du champagne au podium en arrosant la foule.'},
+  {id:'mai68',title:'Report pour Mai 68',category:'insolite',color:'#80c850',x:348.0,y:891.7,img:null,link:'https://en.wikipedia.org/wiki/1968_24_Hours_of_Le_Mans',body:'<b>1968</b> — Unique édition reportée (septembre). Willy Mairesse ferme mal sa portière au sprint du départ — fin de carrière.'},
+  {id:'ickx1969',title:'Marche de protestation d\'Ickx',category:'victoire',color:'#50b860',x:443.6,y:922.0,img:null,link:'https://en.wikipedia.org/wiki/1969_24_Hours_of_Le_Mans',body:'<b>1969</b> — Ickx traverse la piste en marchant pour protester. Part dernier, gagne avec 120 m d\'avance. Arrivée la plus serrée de l\'histoire.'},
+  {id:'mcqueen1970',title:'Steve McQueen — film Le Mans',category:'insolite',color:'#80c850',x:55,y:700,img:null,link:'https://fr.wikipedia.org/wiki/Le_Mans_(film)#Tournage',body:'<b>1970</b> — McQueen engage une Porsche 908 équipée de caméras dans la vraie course. Le cascadeur David Piper perd une jambe. Film culte sorti en 1971.'},
+  {id:'record1971',title:'Record de distance — 5 335 km',category:'record',color:'#c8a94e',x:505.6,y:881.6,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Porsche_917_IAA_2013.JPG?width=400',link:'https://fr.wikipedia.org/wiki/Porsche_917#Résultats_en_course',body:'<b>1971</b> — Marko & van Lennep parcourent 5 335 km (Porsche 917K). Moyenne 222 km/h. Record imbattable depuis les chicanes de 1990.'},
+  {id:'matra1972',title:'Matra & Graham Hill — Triple Couronne',category:'victoire',color:'#50b860',x:874.3,y:756.0,img:null,link:'https://en.wikipedia.org/wiki/1972_24_Hours_of_Le_Mans',body:'<b>1972</b> — Matra redonne la victoire à la France. Graham Hill complète la Triple Couronne (Monaco, Indy, Le Mans) — exploit inégalé.'},
+  {id:'newman1979',title:'Paul Newman finit 2e',category:'insolite',color:'#80c850',x:521.3,y:858.6,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_1979#Déroulement_de_la_course',body:'<b>1979</b> — L\'acteur (54 ans) termine 2e au général en Porsche 935. Meilleure perf d\'un acteur-pilote au Mans.'},
+  {id:'rondeau1980',title:'Rondeau — pilote-constructeur',category:'victoire',color:'#50b860',x:428.8,y:887.1,img:null,link:'https://fr.wikipedia.org/wiki/Jean_Rondeau_(pilote)#Biographie',body:'<b>1980</b> — Jean Rondeau, artisan manceau, gagne au volant de sa propre voiture. Seul pilote-constructeur vainqueur de l\'histoire.'},
+  {id:'gartner1986',title:'Jo Gartner — 1986',category:'death',color:'#e85040',x:460,y:394,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Porsche_962C_LM.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Jo_Gartner#Biographie',body:'<b>1986</b> — Le pilote autrichien (Porsche 962C) se tue à 260+ km/h sur les Hunaudières. Il avait 32 ans.'},
+  {id:'record405',title:'Record 405 km/h — Dorchy',category:'record',color:'#c8a94e',x:617.8,y:304.1,img:'https://commons.wikimedia.org/wiki/Special:FilePath/WM_P88.jpg?width=400',link:'https://fr.wikipedia.org/wiki/WM_P88#Historique',body:'<b>1988</b> — Roger Dorchy atteint 407 km/h (annoncé 405 pour la Peugeot 405). Record éternel depuis les chicanes de 1990.'},
+  {id:'mazda1991',title:'Mazda 787B — moteur rotatif',category:'victoire',color:'#50b860',x:473.0,y:856.3,img:null,link:'https://fr.wikipedia.org/wiki/Mazda_787B#Genèse_du_projet',body:'<b>1991</b> — Seule victoire d\'un moteur Wankel et première victoire japonaise. Son rugissement à 10 000 tr/min reste légendaire. Moteurs rotatifs bannis dès 1992.'},
+  {id:'enjolras1997',title:'Sébastien Enjolras — 1997',category:'death',color:'#e85040',x:828,y:183,img:null,link:'https://fr.wikipedia.org/wiki/Sébastien_Enjolras#Biographie',body:'<b>1997</b> — Enjolras se tue en essais privés. Sa WR décolle sur les Hunaudières à très haute vitesse.'},
+  {id:'mercedesCLR',title:'Mercedes CLR — Envols 1999',category:'accident',color:'#e8a040',x:17,y:728,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Mercedes-Benz_CLR_at_Goodwood_Festival_of_Speed_2014.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Mercedes-Benz_CLR#Course',body:'<b>1999</b> — 3 Mercedes CLR décollent. Dumbreck catapulté dans les arbres à 300 km/h, miraculeusement indemne. Mercedes se retire.'},
+  {id:'audi2006',title:'Audi R10 — 1ère victoire diesel',category:'victoire',color:'#50b860',x:497.9,y:843.5,img:null,link:'https://en.wikipedia.org/wiki/2006_24_Hours_of_Le_Mans',body:'<b>2006</b> — L\'Audi R10 TDI (V12 diesel biturbo) gagne. Premier diesel vainqueur. Échappement si propre qu\'un mouchoir reste blanc.'},
+  {id:'recordDist2010',title:'Record distance 5 410 km',category:'record',color:'#c8a94e',x:457.6,y:832.9,img:null,link:'https://en.wikipedia.org/wiki/2010_24_Hours_of_Le_Mans',body:'<b>2010</b> — L\'Audi R15 TDI couvre 5 410 km (397 tours). Record moderne de distance.'},
+  {id:'audi2011',title:'Audi R18 — Crashs 2011',category:'accident',color:'#e8a040',x:1233.2,y:484.3,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Audi_R18_TDI.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Audi_R18_TDI#24_Heures_du_Mans_2011',body:'<b>2011</b> — Rockenfeller détruit son Audi R18 à Indianapolis. Crash spectaculaire, pilote indemne.'},
+  {id:'leenaGade',title:'Leena Gade — 1ère femme ingénieure',category:'insolite',color:'#80c850',x:419.2,y:859.8,img:null,link:'https://fr.wikipedia.org/wiki/Leena_Gade#Biographie',body:'<b>2011-2014</b> — Première femme à diriger la stratégie d\'une voiture victorieuse (Audi R18). Trois victoires en quatre ans.'},
+  {id:'toyota2012',title:'Toyota TS030 — Davidson',category:'accident',color:'#e8a040',x:1196.1,y:452.8,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Toyota_TS030_Hybrid_2012.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Toyota_TS030_Hybrid#Historique',body:'<b>2012</b> — Davidson percuté par une Ferrari, décolle à Indianapolis. Fractures vertébrales, il survit.'},
+  {id:'simonsen2013',title:'Allan Simonsen — 2013',category:'death',color:'#e85040',x:62,y:783,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Aston_Martin_Vantage_GTE_at_2013_Le_Mans.jpg?width=400',link:'https://en.wikipedia.org/wiki/2013_24_Hours_of_Le_Mans',body:'<b>22 juin 2013</b> — Le Danois (Aston Martin GTE n°95) perd le contrôle au Tertre Rouge. Dernier pilote décédé au Mans.'},
+  {id:'hulk2015',title:'Hülkenberg vainqueur surprise',category:'victoire',color:'#50b860',x:504.1,y:913.3,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_2015#Déroulement_de_la_course',body:'<b>2015</b> — Le pilote F1 Nico Hülkenberg gagne contre toute attente avec Porsche. "On roulait juste à notre rythme."'},
+  {id:'toyota2016',title:'Toyota heartbreak — dernier tour',category:'accident',color:'#e8a040',x:538.7,y:402.5,img:null,link:'https://en.wikipedia.org/wiki/2016_24_Hours_of_Le_Mans',body:'<b>2016</b> — Toyota en tête à 3 min de l\'arrivée, panne de turbo dans les Hunaudières. Nakajima effondré. Porsche hérite de la victoire.'},
+  {id:'recordKobayashi',title:'Record du tour — Kobayashi',category:'record',color:'#c8a94e',x:38,y:665,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Toyota_TS050_Hybrid_at_the_2017_24_Hours_of_Le_Mans.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Toyota_TS050',body:'<b>2017</b> — Kamui Kobayashi (Toyota TS050) : 3\'14"791, 251 km/h de moyenne sur 13,626 km.'},
+  {id:'toyota2018',title:'Toyota + Alonso — enfin !',category:'victoire',color:'#50b860',x:476.1,y:915.1,img:null,link:'https://en.wikipedia.org/wiki/2018_24_Hours_of_Le_Mans',body:'<b>2018</b> — Après 20 participations, Toyota gagne enfin. Alonso complète la 2e étape de sa Triple Crown.'},
+  {id:'ferrari2023',title:'Ferrari revient — Centenaire',category:'victoire',color:'#50b860',x:389.1,y:911.8,img:null,link:'https://en.wikipedia.org/wiki/2023_24_Hours_of_Le_Mans',body:'<b>2023</b> — Retour triomphal de Ferrari après 50 ans. La 499P gagne pour le 100e anniversaire. 300 000 spectateurs.'},
+  {id:'ferrari2024',title:'Ferrari doublé — déluge',category:'victoire',color:'#50b860',x:376.2,y:959.7,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_du_Mans_2024#Déroulement_de_la_course',body:'<b>2024</b> — Ferrari enchaîne sous la pluie. Record de 329 000 spectateurs. 8 constructeurs en Hypercar.'},
+  {id:'kubica2025',title:'Kubica — privé vainqueur',category:'victoire',color:'#50b860',x:431.9,y:947.5,img:null,link:'https://en.wikipedia.org/wiki/2025_24_Hours_of_Le_Mans',body:'<b>2025</b> — Triplé historique Ferrari. Kubica (1er Polonais) et Ye (1er Chinois) gagnent avec l\'écurie privée AF Corse. 332 000 spectateurs.'},
+  {id:'gpe1',title:'GP Explorer 1 — Squeezie',category:'gpexplorer',color:'#d850a0',x:296.9,y:885.3,img:null,link:'https://fr.wikipedia.org/wiki/GP_Explorer_1',body:'<b>8 oct. 2022</b> — 1ère course F4 de créateurs. Sylvain Levy (Vilebrequin) vainqueur. Joyca percute le mur à 204 km/h. <b>1 041 828 viewers Twitch</b> (record FR).'},
+  {id:'gpe2',title:'GP Explorer 2 — Depielo',category:'gpexplorer',color:'#d850a0',x:270.3,y:893.8,img:null,link:'https://fr.wikipedia.org/wiki/GP_Explorer_2',body:'<b>9 sept. 2023</b> — Depielo gagne. Collision Lanza/Biaggi → cyberharcèlement. 1 300 000 viewers. Gasly et Ocon présents.'},
+  {id:'gpe3',title:'GP Explorer 3 — The Last Race',category:'gpexplorer',color:'#d850a0',x:299.3,y:916.6,img:null,link:'https://fr.wikipedia.org/wiki/GP_Explorer_3',body:'<b>Oct. 2025</b> — Dernière édition, 3 jours. Karchez (ESP) triplé. Kaatsup 1ère femme sur le podium. 1 373 815 viewers, 200 000 spectateurs.'},
+  {id:'motoGP1969',title:'1er GP Moto au Mans',category:'moto',color:'#40c8d8',x:311.3,y:942.5,img:null,link:'https://fr.wikipedia.org/wiki/Grand_Prix_moto_de_France#Historique',body:'<b>1969</b> — Premier Grand Prix moto au Bugatti. Agostini (MV Agusta) domine avec un tour d\'avance en 500cc.'},
+  {id:'24hMotos1978',title:'1ères 24H Motos',category:'moto',color:'#40c8d8',x:321.1,y:899.1,img:null,link:'https://fr.wikipedia.org/wiki/24_Heures_Motos#Genèse',body:'<b>1978</b> — L\'ACO crée sa course d\'endurance moto. Chemarin/Léon (Honda RCB) vainqueurs. Départ "type Le Mans" conservé.'},
+  {id:'puig1995',title:'Puig — accident grave',category:'moto',color:'#40c8d8',x:286.8,y:958.4,img:null,link:'https://fr.wikipedia.org/wiki/Alberto_Puig#Historique',body:'<b>1995</b> — Alberto Puig (NSR500) se fracture la jambe à 260 km/h. Circuit retiré du calendrier MotoGP pour travaux de sécurité (1996-1999).'},
+  {id:'rossi2008',title:'Rossi égale Nieto — 90e victoire',category:'moto',color:'#40c8d8',x:322.9,y:871.3,img:null,link:'https://fr.wikipedia.org/wiki/Grand_Prix_moto_de_France_2008#Résultats_des_MotoGP',body:'<b>2008</b> — Rossi égale le record de 90 victoires. Il invite Nieto à piloter sa Yamaha M1 pour le tour d\'honneur.'},
+  {id:'rossiLM2012',title:'Louis Rossi — local victorieux',category:'moto',color:'#40c8d8',x:331.0,y:962.4,img:null,link:'https://en.wikipedia.org/wiki/2012_French_motorcycle_Grand_Prix',body:'<b>2012</b> — Le Manceau Louis Rossi gagne en Moto3 sous la pluie. Dernière victoire française au Mans jusqu\'à Zarco 2025.'},
+  {id:'bagnaia2023',title:'GP France 2023 — 1000e GP',category:'moto',color:'#40c8d8',x:253.5,y:916.2,img:null,link:'https://fr.wikipedia.org/wiki/Grand_Prix_moto_de_France_2023#Course_principale',body:'<b>2023</b> — Collision Bagnaia/Viñales, partage de scooter cocasse. 278 805 spectateurs (record MotoGP). 1000e Grand Prix de l\'histoire.'},
+  {id:'zarco2025',title:'Zarco — victoire française',category:'moto',color:'#40c8d8',x:334.5,y:923.5,img:null,link:'https://fr.wikipedia.org/wiki/Grand_Prix_moto_de_France_2025#Course_principale',body:'<b>2025</b> — Zarco (Honda) : 1er Français en catégorie reine depuis 71 ans. Record absolu : 311 797 spectateurs.'},
+  {id:'delhalle',title:'Hommage Anthony Delhalle',category:'memorial',color:'#9b6fc0',x:484.7,y:941.8,img:null,link:'https://fr.wikipedia.org/wiki/Anthony_Delhalle#Mort',body:'<b>2017</b> — 5x champion du monde d\'endurance moto, décédé en essais à 35 ans. Espace permanent au Musée des 24H.'},
+  {id:'meulebleue',title:'Grand Prix de la Meule Bleue',category:'insolite',color:'#80c850',x:244.3,y:942.6,img:null,link:'https://meulebleue.fr/',body:'<b>Depuis 2014</b> — Course de mobylettes vintage (Solex, Vespas) sur le Bugatti. 1 000 cyclomoteurs en 2024. Show de drones et Patrouille de France.'},
+  {id:'classic',title:'Le Mans Classic',category:'insolite',color:'#80c850',x:545.6,y:844.6,img:null,link:'https://www.lemansclassic.com/',body:'<b>Depuis 2002</b> — 800 voitures de course anciennes, 8 500 de collection. Courses jour et nuit. 238 000 spectateurs en 2025. "Little Big Mans" pour les enfants.'},
+  {id:'camions',title:'24 Heures Camions',category:'insolite',color:'#80c850',x:300.3,y:854.8,img:null,link:'https://www.24h-camions.com/',body:'<b>Depuis 1981</b> — Camions 5+ tonnes, 1 000 ch, limités à 160 km/h sur le Bugatti. 40e édition en 2025. 80 800 spectateurs.'},
+  {id:'roller',title:'24 Heures Roller',category:'insolite',color:'#80c850',x:259.8,y:965.9,img:null,link:'https://www.24rollers.com/',body:'<b>Depuis 2004</b> — 4 000 patineurs, 30 nationalités. Record solo : 950 km (Stievenart, 2017). Entrée gratuite.'},
+  {id:'velo',title:'24 Heures Vélo',category:'insolite',color:'#80c850',x:274.5,y:865.5,img:null,link:'https://www.24heuresvelo.fr/',body:'<b>Depuis 2009</b> — Record : 1 071 km (256 tours). La "Bosse du Dunlop" (7 %) est redoutée. Bernard Hinault a participé.'},
+  {id:'monument',title:'Monument préféré des Français',category:'insolite',color:'#80c850',x:361.5,y:916.2,img:null,link:'https://www.24h-lemans.com/',body:'<b>Sept. 2024</b> — Le circuit élu Monument préféré des Français (France 3), devant le beffroi de Douai. 1er circuit automobile.'},
+  {id:'wright',title:'Vols de Wilbur Wright',category:'insolite',color:'#80c850',x:650,y:280,img:null,link:'https://fr.wikipedia.org/wiki/Ligne_droite_des_Hunaudières#Histoire',body:'<b>1908</b> — Avant les voitures, la route des Hunaudières a accueilli les premiers vols publics de Wilbur Wright en France.'},
+  {id:'parade',title:'Grande Parade des Pilotes',category:'insolite',color:'#80c850',x:352.7,y:944.7,img:null,link:'https://www.grande-parade-des-pilotes.com/',body:'<b>Annuel</b> — Défilé solennel dans le centre-ville du Mans. 4,4 km, 500 bénévoles, dizaines de milliers de spectateurs.'},
+  {id:'f1unique',title:'Unique GP de F1 au Mans',category:'insolite',color:'#80c850',x:240,y:850,img:null,link:'https://fr.wikipedia.org/wiki/Grand_Prix_automobile_de_France_1967',body:'<b>2 juil. 1967</b> — Brabham gagne devant 20 000 personnes. Les pilotes jugent le Bugatti "sans caractère". Jamais revenu.'},
+  {id:'hunaudieres',title:'Ligne droite des Hunaudières',category:'landmark',color:'#4a9fd4',x:400,y:500,img:null,link:'https://fr.wikipedia.org/wiki/Ligne_droite_des_Hunaudières',body:'<b>6 km légendaires</b> — Plus longue ligne droite au monde. 407 km/h en 1988. Route D338 ouverte au public hors course. 2 chicanes ajoutées en 1990.'},
+  {id:'chicanes1990',title:'Chicanes Hunaudières — 1990',category:'landmark',color:'#4a9fd4',x:302,y:481,img:null,link:'https://fr.wikipedia.org/wiki/Ligne_droite_des_Hunaudières#Ajout_de_deux_chicanes',body:'<b>1990</b> — La FIA impose 2 chicanes (Daytona et Michelin), limitant la vitesse à ~330 km/h au lieu de 400+.'},
+  {id:'mulsanneCorner',title:'Virage de Mulsanne',category:'landmark',color:'#4a9fd4',x:1234,y:21,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Depuis 1923</b> — Freinage le plus violent : 300→75 km/h. La nuit, les disques rougeoyants offrent un spectacle hypnotisant.'},
+  {id:'indianapolis',title:'Virage d\'Indianapolis',category:'landmark',color:'#4a9fd4',x:1223.7,y:457.9,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Inchangé depuis 1923</b> — Seule portion originale du circuit. Envol de Dumbreck (1999). Jo Bonnier tué en 1972.'},
+  {id:'arnage',title:'Virage d\'Arnage',category:'landmark',color:'#4a9fd4',x:1155,y:525,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Point le plus lent</b> — 80 km/h. Spectateurs à quelques mètres. Quasi inchangé en 100 ans. Bentley a nommé un modèle d\'après ce virage.'},
+  {id:'tertreRouge',title:'Tertre Rouge',category:'landmark',color:'#4a9fd4',x:45,y:740,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Virage clé</b> — Relie la partie permanente aux Hunaudières. Sol rougeâtre. Reprofilé après l\'accident Simonsen (2013).'},
+  {id:'passerelle',title:'Passerelle Dunlop',category:'landmark',color:'#4a9fd4',x:276.2,y:932.4,img:'https://commons.wikimedia.org/wiki/Special:FilePath/Dunlop_Bridge_at_Le_Mans.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Passerelle_Dunlop',body:'<b>Depuis 1950</b> — "La Tour Eiffel du circuit." Forme de pneu iconique. Bosse de 7 % (point culminant). McNish tonneau en 2011. Rebaptisée Goodyear en 2026.'},
+  {id:'porsche1972',title:'Virages Porsche',category:'landmark',color:'#4a9fd4',x:853.7,y:775.0,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>1972</b> — Remplacent Maison Blanche. Enchaînement le plus technique : "Section préférée de nombreux pilotes" (ACO).'},
+  {id:'fordchicane',title:'Chicane Ford',category:'landmark',color:'#4a9fd4',x:638,y:817,img:'https://commons.wikimedia.org/wiki/Special:FilePath/1966FordGT40MkII.jpg?width=400',link:'https://fr.wikipedia.org/wiki/Ford_GT40#Victoires_au_Mans',body:'<b>1968</b> — Financée par Henry Ford II. Ralentit les voitures avant les tribunes. 110-130 km/h.'},
+  {id:'chapelle',title:'La Chapelle',category:'landmark',color:'#4a9fd4',x:200,y:880,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Bifurcation Sarthe/Bugatti</b> — Chapelle en cèdre rouge (2011, 5 m²). Vitrail avec une Bugatti des années 1920. Messe annuelle pendant les 24H.'},
+  {id:'esses',title:'Esses de la Forêt',category:'landmark',color:'#4a9fd4',x:130,y:840,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Créées en 1932</b> — Pins disparus depuis. Les pilotes y sont prudents (pneus froids). De nuit, plongée dans l\'obscurité totale.'},
+  {id:'karting',title:'Virage du Karting',category:'landmark',color:'#4a9fd4',x:738,y:820,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_de_la_Sarthe',body:'<b>Zone accidentogène</b> — Dernière courbe avant Ford. Seul banking du circuit actuel. Rénové en 2017.'},
+  {id:'bugatti',title:'Circuit Bugatti',category:'landmark',color:'#4a9fd4',x:226.4,y:909.2,img:null,link:'https://fr.wikipedia.org/wiki/Circuit_Bugatti',body:'<b>Depuis 1965</b> — 4,185 km. Accueille MotoGP, 24H Motos, GP Explorer. Partage stands et Dunlop avec le grand circuit.'},
+  {id:'musee',title:'Musée des 24H (futur M24)',category:'landmark',color:'#4a9fd4',x:512.7,y:940.8,img:null,link:'https://fr.wikipedia.org/wiki/Musée_des_24_Heures_du_Mans',body:'<b>Depuis 1961</b> — 140+ véhicules historiques. En rénovation 2025-2026, réouverture mai 2026 sous le nom "M24" (10 000 m²).'},
+];
+
+
+
+
+// Map is now Leaflet-based (see satellite section below)
+
+// ===== PANEL =====
+const CAT_ICONS = {
+  death: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 22h20L12 2z"/><line x1="12" y1="9" x2="12" y2="15"/><circle cx="12" cy="18" r="0.5" fill="currentColor"/></svg>`,
+  accident: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 7v6"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>`,
+  record: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 15,9 22,9 16,14 18,21 12,17 6,21 8,14 2,9 9,9"/></svg>`,
+  victoire: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9a6 6 0 1 1 12 0c0 4-3 6-6 10-3-4-6-6-6-10z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
+  moto: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17h3l4-7h5l2 7"/><path d="M9 17l2-4h4"/></svg>`,
+  gpexplorer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="3"/></svg>`,
+  insolite: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l2.4 7.2H22l-6 4.8 2.4 7.2L12 16.4 5.6 21.2 8 14 2 9.2h7.6z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  landmark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M5 21V7l7-5 7 5v14"/><rect x="9" y="13" width="6" height="8"/><line x1="12" y1="7" x2="12" y2="10"/></svg>`,
+  memorial: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="2" x2="12" y2="22"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M8 22c0-3 2-5 4-5s4 2 4 5"/></svg>`
+};
+const CAT_BG = {death:'rgba(232,80,64,0.12)',accident:'rgba(232,160,64,0.12)',record:'rgba(200,169,78,0.12)',victoire:'rgba(80,184,96,0.12)',moto:'rgba(64,200,216,0.12)',gpexplorer:'rgba(216,80,160,0.12)',insolite:'rgba(128,200,80,0.12)',landmark:'rgba(74,159,212,0.12)',memorial:'rgba(155,111,192,0.12)'};
+
+// Media: arrays of {type:'img'|'yt', src:'url or youtube_id'}
+const EVENT_MEDIA = {
+  premiere1923:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Chenard_et_Walcker_Tank.jpg?width=400'},{type:'yt',src:'tNRUnNeZI6g'}],
+  bentley1924:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1927%20Bentley%20Le%20Mans%203%20Litre.jpg?width=400'}],
+  departLM:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/LeMansStart1963.jpg?width=400'},{type:'yt',src:'g63iM83Nwdc'}],
+  crash1927:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1927%20Bentley%20Le%20Mans%203%20Litre.jpg?width=400'}],
+  rosier1950:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Louis%20Rosier%20Zandvoort%201950.jpg?width=400'}],
+  levegh1952:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Alfred%20Levegh%20vainqueur%20de%20Paris-Toulouse-Paris%201900%20sur%20Mors%20%C3%A0%20pneus%20Michelin.jpg?width=400'}],
+  jaguar1953:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1953%20Jaguar%20C-Type%20Lightweight%20Works%20HCC24.jpg?width=400'}],
+  catastrophe1955:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1955_Le_Mans_disaster.jpg?width=400'},{type:'yt',src:'7QJOTIbR8MY'}],
+  memorial1955:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1955_Le_Mans_disaster.jpg?width=400'}],
+  ferrari60_65:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Ferrari_250_P_-_Chassis_0810_-_2014_Le_Mans_Classic.jpg?width=400'}],
+  ford1966:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1966FordGT40MkII.jpg?width=400'},{type:'yt',src:'ac8_ds5nLSA'}],
+  gurney1967:[{type:'yt',src:'Kxjsx_WLxT4'}],
+  mai68:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1968%20Ford%20GT40%20Mk%20I%20%2814288662849%29.jpg?width=400'}],
+  ickx1969:[{type:'yt',src:'g63iM83Nwdc'}],
+  mcqueen1970:[{type:'yt',src:'228f-dPxI3Q'}],
+  record1971:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Porsche_917_IAA_2013.JPG?width=400'},{type:'yt',src:'B0fy0RYRfog'}],
+  matra1972:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Matra%20MS670%20Pescarolo.jpg?width=400'}],
+  newman1979:[{type:'yt',src:'sTlpkJN6PUY'}],
+  rondeau1980:[{type:'yt',src:'Ap7i5DDVcOI'}],
+  gartner1986:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Porsche_962C_LM.jpg?width=400'}],
+  record405:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/WM_P88.jpg?width=400'},{type:'yt',src:'ZlfylXY3eCw'}],
+  mazda1991:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Mazda_787B_-_Flickr_-_exfordy.jpg?width=400'},{type:'yt',src:'C3fxp-5NraM'}],
+  enjolras1997:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/WR_LM_Peugeot_%28Le_Mans_2005%29.jpg?width=400'}],
+  mercedesCLR:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Mercedes-Benz_CLR_at_Goodwood_Festival_of_Speed_2014.jpg?width=400'},{type:'yt',src:'e21ZjwZGjiQ'}],
+  audi2006:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Audi_R10_TDI_Le_Mans_2006.jpg?width=400'},{type:'yt',src:'VOIWB8YA0mY'}],
+  recordDist2010:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Audi%20R15%20TDI%20Mans.jpg?width=400'}],
+  audi2011:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Audi_R18_TDI.jpg?width=400'},{type:'yt',src:'55UAGLV_Umc'}],
+  leenaGade:[{type:'yt',src:'1z5m4djTKDM'}],
+  toyota2012:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Toyota_TS030_Hybrid_2012.jpg?width=400'},{type:'yt',src:'WMRi9F89Nb0'}],
+  simonsen2013:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Aston_Martin_Vantage_GTE_at_2013_Le_Mans.jpg?width=400'}],
+  hulk2015:[{type:'yt',src:'TVbUdUc7zj4'}],
+  toyota2016:[{type:'yt',src:'V_7sZ00cAmE'}],
+  recordKobayashi:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Toyota_TS050_Hybrid_at_the_2017_24_Hours_of_Le_Mans.jpg?width=400'},{type:'yt',src:'j9ohHhgEfUM'}],
+  toyota2018:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Toyota_TS050_Hybrid_-_Le_Mans_2018.jpg?width=400'},{type:'yt',src:'sndZGAEJ9Gs'}],
+  ferrari2023:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Ferrari_499P_at_Le_Mans_2023.jpg?width=400'},{type:'yt',src:'JDOxiwR9CUI'}],
+  ferrari2024:[{type:'yt',src:'forIYtrFoPc'}],
+  kubica2025:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/2025%206%20Hours%20of%20Imola%20AF%20Corse%20Ferrari%20499P%20No.83%20-%20Hanson%2C%20Kubica%2C%20Ye.jpg?width=400'}],
+  gpe1:[{type:'yt',src:'CmgyUYCibwA'}],
+  gpe2:[{type:'yt',src:'G8Vy7rmjD4M'}],
+  gpe3:[{type:'yt',src:'0P8h4rLlXKQ'}],
+  motoGP1969:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Giacomo%20Agostini%20%28It.%29%20in%20actie%20op%20de%20500cc%20MV%20Agusta%2C%20Bestanddeelnr%20922-5688.jpg?width=400'}],
+  '24hMotos1978':[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/24%20heures%20du%20mans%20moto%202010%20%284539187294%29.jpg?width=400'}],
+  puig1995:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Alberto%20Puig%201994%20Suzuka.jpeg?width=400'}],
+  rossi2008:[{type:'yt',src:'JY9mrKR5SkA'}],
+  rossiLM2012:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Moto3%20Le%20Mans%202015.jpg?width=400'}],
+  bagnaia2023:[{type:'yt',src:'64rCId0ULO4'}],
+  zarco2025:[{type:'yt',src:'3IDPKnDk0FQ'}],
+  delhalle:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Anthony%20Delhalle%20aux%2024H%20du%20Mans%20moto%202014.JPG?width=400'}],
+  meulebleue:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/VeloSoleX_3800_Kiel.jpg?width=400'}],
+  classic:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le_Mans_Classic_2012.jpg?width=400'},{type:'yt',src:'bCB49xlO7t4'}],
+  camions:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Fiat%20Bartletti%20Scarab%20Truck%20-%20Corbra%20Racing.jpg?width=400'}],
+  roller:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Inline_speed_skating_Wuest.jpg?width=400'}],
+  velo:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Tour_de_France_2019%2C_%C3%A9tape_11%2C_peloton.jpg?width=400'}],
+  monument:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le%20Mans%20From%20Above.jpg?width=400'}],
+  wright:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Wilbur%20Wright%20Le%20Mans%201908.jpg?width=400'}],
+  parade:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le%20mans%2091%20parade%20pilotes%20-%201.jpg?width=400'}],
+  f1unique:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Brabham_BT24_%282%29.jpg?width=400'}],
+  hunaudieres:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/The%20Mulsanne%20Straight%20%285847759679%29.jpg?width=400'},{type:'yt',src:'NfaJVXiLasE'}],
+  chicanes1990:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/The%20Mulsanne%20Straight%20%285847759679%29.jpg?width=400'}],
+  mulsanneCorner:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Kremer%20K8%20-%20Derek%20Bell%2C%20Jurgen%20Lassig%20%26%20Robin%20Donovan%20enters%20Mulsanne%20Corner%20at%20the%201994%20Le%20Mans%20%2831933400736%29.jpg?width=400'}],
+  indianapolis:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le_Mans_2011_-_Indianapolis.jpg?width=400'}],
+  arnage:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/KSM%20Lola%20Mazda.jpg?width=400'}],
+  tertreRouge:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Terte%20Rouge%20at%20night%202008.jpg?width=400'}],
+  porsche1972:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le%20Mans%202014%20-%20LMP2s%20on%20Formation%20Lap%20at%20Porsche%20Curves%20%2814252385317%29.jpg?width=400'}],
+  chapelle:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Circuit_de_la_Sarthe_track_map.svg?width=400'}],
+  esses:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le%20Mans%20Esses%20at%20night.jpg?width=400'}],
+  karting:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Le_Mans_2011_-_Indianapolis.jpg?width=400'}],
+  bugatti:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Bugatti%20Circuit%201991-1996.png?width=400'}],
+  musee:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Mus%C3%A9e%20automobile%20de%20la%20Sarthe%202014.jpg?width=400'}],
+  passerelle:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/Dunlop_Bridge_at_Le_Mans.jpg?width=400'}],
+  fordchicane:[{type:'img',src:'https://commons.wikimedia.org/wiki/Special:FilePath/1966FordGT40MkII.jpg?width=400'}],
+};
+
+// YouTube placeholder: thumbnail + play button, replaced by iframe on click
+function ytPlaceholder(id, height) {
+  const h = height || 320;
+  return `<div class="yt-placeholder" data-yt-id="${id}" style="height:${h}px">
+    <img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="Vidéo YouTube" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${id}/mqdefault.jpg'">
+    <div class="yt-play-btn"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55c-2.93.78-4.63 3.26-5.42 6.19C.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#f00"/><path d="M45 24L27 14v20" fill="#fff"/></svg></div>
+  </div>`;
+}
+
+function buildMediaHTML(ev) {
+  const media = EVENT_MEDIA[ev.id];
+  // Fallback: single image from ev.img or icon
+  if (!media || media.length === 0) {
+    if (ev.img) {
+      return `<div class="panel-img"><img src="${ev.img}" alt="${ev.title}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+    }
+    return `<div class="panel-header-icon" style="background:${CAT_BG[ev.category]};color:${ev.color}">${CAT_ICONS[ev.category]}</div>`;
+  }
+  if (media.length === 1) {
+    const m = media[0];
+    if (m.type === 'yt') return `<div class="panel-img">${ytPlaceholder(m.src, 320)}</div>`;
+    return `<div class="panel-img"><img src="${m.src}" alt="${ev.title}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+  }
+  // Carousel
+  const uid = 'mc_' + ev.id;
+  let slides = media.map((m, i) => {
+    if (m.type === 'yt') return `<div class="slide">${ytPlaceholder(m.src, 320)}</div>`;
+    return `<div class="slide"><img src="${m.src}" alt="${ev.title}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+  }).join('');
+  let dots = media.map((_, i) => `<span class="dot-ind${i===0?' active':''}" data-i="${i}"></span>`).join('');
+  return `<div class="media-carousel" id="${uid}"><div class="slides">${slides}</div><div class="dots">${dots}</div></div>`;
+}
+
+// Event delegation: click on yt-placeholder swaps it with an iframe
+document.addEventListener('click', e => {
+  const ph = e.target.closest('.yt-placeholder');
+  if (!ph) return;
+  const id = ph.dataset.ytId;
+  if (!id) return;
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+  iframe.setAttribute('allow', 'accelerometer;autoplay;encrypted-media;gyroscope;picture-in-picture');
+  iframe.setAttribute('allowfullscreen', '');
+  iframe.style.cssText = 'width:100%;height:100%;border:none;border-radius:8px;display:block';
+  ph.replaceWith(iframe);
+});
+
+// Extract year from event title/body for chronological sort
+function extractYear(ev) {
+  const text = (ev.title || '') + ' ' + (ev.body || '');
+  const m = text.match(/\b(18\d{2}|19\d{2}|20\d{2})\b/);
+  return m ? parseInt(m[1]) : 9999;
+}
+// Chronologically sorted events (for keyboard navigation and timeline)
+const EVENTS_SORTED = [...EVENTS].sort((a,b) => extractYear(a) - extractYear(b));
+let currentSelectedId = null;
+
+function getNavEvents() {
+  // Returns events filtered by activeFilter, chronologically sorted
+  return EVENTS_SORTED.filter(e => activeFilter === 'all' || e.category === activeFilter);
+}
+
+function navigateEvent(dir) {
+  const list = getNavEvents();
+  if (!list.length) return;
+  let idx = currentSelectedId ? list.findIndex(e => e.id === currentSelectedId) : -1;
+  idx = (idx + dir + list.length) % list.length;
+  showPanel(list[idx]);
+}
+
+function showPanel(ev){
+  currentSelectedId = ev.id;
+  window._selected2DEvent = ev.id; // Store for 3D sync
+  // Update URL hash for sharing
+  try { history.replaceState(null, '', '#ev=' + ev.id); } catch(e) {}
+  if (typeof updateTimelineHighlight === 'function') updateTimelineHighlight();
+  // Highlight selected marker on Leaflet map
+  if (satMap && satMarkers) {
+    satMarkers.forEach(m => {
+      if (m._evId === ev.id) {
+        m.setStyle({color:'#fff', weight:3});
+        m.setRadius(10);
+      } else {
+        m.setStyle({color:'#0a0c10', weight:1.5});
+        m.setRadius(7);
+      }
+    });
+    // Zoom to the event on the map
+    const gps = EVENT_GPS[ev.id];
+    if(gps) satMap.flyTo(gps, 15, {duration: 0.8});
+  }
+  document.getElementById('panel-title').textContent = ev.title;
+  const cat = document.getElementById('panel-cat');
+  cat.textContent = CAT_LABELS[ev.category];
+  cat.style.color = ev.color;
+
+  let content = buildMediaHTML(ev);
+  content += ev.body;
+  if(ev.link){
+    const linkLabel = ev.link.includes('wikipedia.org') ? 'Wikipedia' : new URL(ev.link).hostname.replace('www.','');
+    content += `<div style="margin-top:12px"><a class="panel-link" href="${ev.link}" target="_blank" rel="noopener">↗ En savoir plus — ${linkLabel}</a></div>`;
+  }
+
+  document.getElementById('panel-body').innerHTML = content;
+  document.getElementById('info-panel').classList.add('visible');
+  const mobileClose = document.getElementById('panel-close-mobile');
+  if(mobileClose) mobileClose.style.display = window.innerWidth <= 768 ? 'flex' : '';
+  // Carousel dot navigation
+  const carousel = document.getElementById('mc_' + ev.id);
+  if (carousel) {
+    const slides = carousel.querySelector('.slides');
+    const dots = carousel.querySelectorAll('.dot-ind');
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const i = parseInt(dot.dataset.i);
+        slides.scrollTo({left: i * slides.offsetWidth, behavior: 'smooth'});
+      });
+    });
+    slides.addEventListener('scroll', () => {
+      const idx = Math.round(slides.scrollLeft / slides.offsetWidth);
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    });
+  }
+}
+
+function closePanel(){
+  currentSelectedId = null;
+  try { history.replaceState(null, '', window.location.pathname); } catch(e) {}
+  if (typeof updateTimelineHighlight === 'function') updateTimelineHighlight();
+  document.getElementById('info-panel').classList.remove('visible');
+  const mobileClose = document.getElementById('panel-close-mobile');
+  if(mobileClose) mobileClose.style.display = 'none';
+  // Reset marker styles
+  if (satMarkers) satMarkers.forEach(m => { m.setStyle({color:'#0a0c10',weight:1.5}); m.setRadius(7); });
+  // Zoom back to full circuit
+  if (satMap) satMap.flyToBounds(L.latLngBounds(CIRCUIT_GPS_FULL), {padding:[40,40], duration:0.6});
+}
+
+// Keyboard navigation (2D only, 3D has its own handlers)
+document.addEventListener('keydown', e => {
+  if (is3D) return; // 3D mode has its own keyboard handling
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+  if (e.key === 'Escape') { closePanel(); e.preventDefault(); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { navigateEvent(1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { navigateEvent(-1); e.preventDefault(); }
+  else if (e.key === '/') { const inp = document.getElementById('search-input'); if (inp) { inp.focus(); e.preventDefault(); } }
+});
+
+// Allow touch scrolling inside info panel
+document.getElementById('info-panel').addEventListener('touchstart', e => e.stopPropagation(), {passive:true});
+document.getElementById('info-panel').addEventListener('touchmove', e => e.stopPropagation(), {passive:true});
+
+// Filters
+let activeFilter = 'all';
+
+// Add event counts to filter buttons
+(function updateFilterCounts() {
+  const counts = {all: 0};
+  EVENTS.forEach(ev => {
+    counts.all++;
+    counts[ev.category] = (counts[ev.category] || 0) + 1;
+  });
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    const f = btn.dataset.filter;
+    const n = counts[f] || 0;
+    const dot = btn.querySelector('.dot');
+    const label = btn.textContent.trim();
+    btn.innerHTML = '';
+    if (dot) btn.appendChild(dot);
+    btn.appendChild(document.createTextNode(label + ' (' + n + ')'));
+  });
+})();
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    if (typeof filterSatMarkers === 'function') filterSatMarkers();
+    if (typeof updateTimelineHighlight === 'function') updateTimelineHighlight();
+  });
+});
+
+// Resize handler for 3D
+window.addEventListener('resize', () => {
+  if(is3D && renderer3d) {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera3d.aspect = w / h;
+    camera3d.updateProjectionMatrix();
+    renderer3d.setSize(w, h);
+    document.getElementById('view3d').style.width = w + 'px';
+    document.getElementById('view3d').style.height = h + 'px';
+  }
+  if(satMap) satMap.invalidateSize();
+});
+
+// ===== 3D IMMERSIVE MODE =====
+const TRACK_PTS=[
+[418.0,916.6],[410.9,917.9],[403.8,919.2],[396.7,920.6],[389.7,922.0],[382.6,923.4],[375.5,924.7],[368.4,926.0],[361.4,927.3],[354.3,928.6],[347.2,929.9],[340.1,931.1],[333.0,932.3],[325.9,933.2],[318.7,933.9],[311.5,934.3],[304.3,934.6],[297.1,934.8],[289.9,934.8],[282.7,934.6],[275.5,933.8],[268.4,932.7],[261.3,931.3],[254.3,929.6],[247.7,926.9],[241.8,922.8],[236.4,918.0],[231.3,912.9],[226.4,907.6],[221.6,902.3],[216.7,897.0],[211.2,892.3],[204.6,893.6],[197.8,896.5],[191.4,894.8],[186.2,889.9],[181.1,884.8],[176.1,879.6],[171.1,874.4],[166.0,869.2],[160.9,864.2],[155.2,859.8],[148.8,856.5],[142.1,853.7],[135.5,850.8],[129.4,847.2],[124.0,842.4],[119.3,837.0],[115.8,830.6],[113.8,823.8],[112.3,816.7],[110.9,809.6],[109.3,802.5],[107.0,795.8],[102.7,790.0],[96.9,786.0],[89.8,784.8],[82.7,785.5],[75.6,787.0],[68.5,786.3],[62.3,782.7],[56.6,778.3],[51.2,773.5],[45.9,768.6],[41.1,763.3],[36.9,757.4],[32.7,751.6],[28.6,745.6],[24.6,739.6],[20.7,733.6],[16.8,727.5],[13.1,721.4],[10.8,714.5],[11.6,707.6],[14.6,701.0],[18.1,694.7],[21.8,688.5],[25.6,682.3],[29.5,676.3],[33.6,670.3],[38.4,665.0],[43.4,659.9],[48.5,654.8],[53.6,649.7],[58.7,644.6],[63.8,639.5],[68.9,634.4],[74.0,629.4],[79.2,624.3],[84.3,619.3],[89.5,614.3],[94.7,609.2],[99.8,604.2],[105.0,599.3],[110.2,594.3],[115.5,589.4],[121.2,585.0],[127.3,581.2],[133.5,577.6],[139.8,574.0],[146.0,570.4],[152.3,566.8],[158.5,563.2],[164.8,559.7],[171.0,556.1],[177.3,552.5],[183.5,548.9],[189.8,545.4],[196.0,541.8],[202.3,538.2],[208.5,534.6],[214.8,531.1],[221.1,527.5],[227.3,524.0],[233.6,520.4],[239.8,516.8],[246.1,513.3],[252.4,509.7],[258.6,506.1],[264.9,502.6],[271.2,499.0],[277.4,495.5],[283.7,491.9],[289.9,488.4],[296.2,484.8],[302.5,481.3],[308.7,477.7],[315.0,474.2],[321.3,470.6],[327.6,467.1],[333.8,463.5],[340.1,460.0],[346.4,456.4],[352.6,452.9],[358.9,449.3],[365.2,445.8],[371.4,442.3],[377.7,438.7],[384.0,435.2],[390.3,431.6],[396.5,428.1],[402.8,424.6],[409.1,421.0],[415.4,417.5],[421.6,414.0],[427.9,410.4],[434.2,406.9],[440.4,403.4],[446.7,399.8],[453.0,396.3],[459.8,394.5],[466.6,396.9],[473.7,398.0],[480.0,394.8],[484.0,388.9],[487.3,382.5],[491.2,376.5],[496.2,371.4],[502.4,367.7],[508.6,364.1],[514.9,360.5],[521.1,356.9],[527.4,353.4],[533.6,349.8],[539.9,346.2],[546.1,342.6],[552.4,339.1],[558.6,335.5],[564.9,332.0],[571.2,328.4],[577.4,324.8],[583.7,321.3],[590.0,317.7],[596.2,314.2],[602.5,310.6],[608.8,307.1],[615.0,303.6],[621.3,300.0],[627.6,296.5],[633.9,292.9],[640.1,289.4],[646.4,285.8],[652.7,282.3],[659.0,278.8],[665.2,275.2],[671.5,271.7],[677.8,268.2],[684.1,264.6],[690.4,261.1],[696.6,257.6],[702.9,254.0],[709.2,250.5],[715.5,247.0],[721.7,243.4],[728.0,239.9],[734.3,236.4],[740.6,232.8],[746.9,229.3],[753.1,225.7],[759.4,222.2],[765.7,218.7],[772.0,215.1],[778.2,211.6],[784.5,208.0],[790.8,204.5],[797.0,201.0],[803.3,197.4],[809.6,193.9],[815.8,190.3],[822.1,186.7],[828.4,183.2],[834.6,179.6],[840.9,176.1],[847.1,172.5],[853.4,169.0],[859.6,165.4],[865.9,161.8],[872.1,158.2],[878.4,154.7],[884.6,151.1],[890.9,147.5],[896.9,143.7],[900.9,137.7],[902.0,130.6],[903.5,123.6],[909.2,119.4],[916.3,118.9],[923.5,119.3],[930.7,119.4],[937.9,118.5],[944.5,115.9],[950.8,112.3],[957.1,108.8],[963.4,105.3],[969.6,101.7],[975.9,98.2],[982.2,94.8],[988.6,91.4],[995.1,88.3],[1001.7,85.5],[1008.6,83.3],[1015.5,81.3],[1022.4,79.3],[1029.3,77.3],[1036.3,75.3],[1043.2,73.4],[1050.1,71.4],[1057.0,69.5],[1064.0,67.5],[1070.9,65.6],[1077.9,63.6],[1084.8,61.7],[1091.7,59.8],[1098.7,57.9],[1105.6,56.0],[1112.6,54.1],[1119.5,52.2],[1126.5,50.3],[1133.4,48.4],[1140.4,46.5],[1147.3,44.6],[1154.3,42.7],[1161.2,40.8],[1168.2,38.9],[1175.1,37.0],[1182.1,35.2],[1189.0,33.3],[1196.0,31.4],[1202.9,29.5],[1209.9,27.7],[1216.9,25.8],[1223.8,24.0],[1230.8,22.1],[1237.8,20.3],[1244.8,18.6],[1251.8,16.8],[1258.7,15.1],[1265.7,13.3],[1272.7,11.7],[1279.7,10.0],[1286.9,9.8],[1294.1,9.9],[1301.4,10.0],[1308.6,10.2],[1315.7,10.8],[1321.4,14.5],[1321.4,21.8],[1321.0,29.0],[1320.6,36.2],[1320.3,43.4],[1319.9,50.5],[1319.5,57.7],[1319.2,64.9],[1318.8,72.1],[1318.5,79.3],[1318.1,86.5],[1317.7,93.7],[1317.3,100.9],[1317.0,108.1],[1316.6,115.3],[1316.2,122.5],[1315.8,129.7],[1315.4,136.9],[1315.0,144.1],[1314.6,151.2],[1314.2,158.4],[1313.8,165.6],[1313.4,172.8],[1313.0,180.0],[1312.5,187.2],[1312.1,194.4],[1311.4,201.5],[1309.8,208.6],[1308.0,215.5],[1306.2,222.5],[1304.4,229.5],[1302.5,236.4],[1300.7,243.4],[1298.8,250.4],[1297.0,257.3],[1295.2,264.3],[1293.3,271.2],[1291.4,278.2],[1289.6,285.2],[1287.7,292.1],[1285.8,299.1],[1283.9,306.0],[1282.0,313.0],[1280.0,319.9],[1278.1,326.8],[1276.1,333.7],[1274.1,340.7],[1271.7,347.4],[1268.8,354.0],[1265.8,360.6],[1262.7,367.1],[1259.7,373.6],[1256.7,380.2],[1253.6,386.7],[1250.6,393.3],[1247.6,399.8],[1244.5,406.4],[1241.5,412.9],[1238.4,419.5],[1235.3,426.0],[1232.3,432.5],[1229.2,439.0],[1226.1,445.5],[1222.9,452.0],[1219.8,458.5],[1216.6,464.9],[1213.4,471.4],[1210.2,477.8],[1206.9,484.2],[1203.6,490.5],[1199.2,496.0],[1193.1,499.9],[1186.8,503.5],[1180.4,506.8],[1173.9,510.0],[1167.6,513.4],[1161.6,517.3],[1159.3,523.8],[1160.3,531.0],[1163.8,537.2],[1167.6,543.2],[1171.6,549.2],[1175.6,555.2],[1179.7,561.2],[1183.8,567.1],[1188.0,573.1],[1192.0,579.0],[1196.0,585.0],[1199.7,591.3],[1197.2,597.0],[1190.7,600.1],[1184.2,603.1],[1177.6,606.2],[1171.1,609.2],[1164.6,612.2],[1158.0,615.2],[1151.5,618.2],[1144.9,621.2],[1138.4,624.2],[1131.8,627.2],[1125.2,630.2],[1118.7,633.2],[1112.1,636.2],[1105.6,639.1],[1099.0,642.2],[1092.5,645.2],[1085.9,648.2],[1079.4,651.2],[1072.9,654.3],[1066.4,657.4],[1060.1,660.8],[1054.4,665.2],[1048.7,669.6],[1043.0,674.0],[1037.3,678.5],[1031.7,683.0],[1026.1,687.5],[1020.4,691.9],[1014.8,696.4],[1009.1,700.9],[1003.5,705.4],[997.8,709.8],[992.1,714.2],[986.4,718.6],[980.6,722.9],[974.8,727.2],[969.2,731.7],[963.7,736.3],[958.4,741.2],[953.3,746.3],[948.5,751.6],[943.7,757.0],[938.9,762.3],[933.9,767.6],[928.7,772.6],[923.3,777.4],[917.6,781.8],[911.5,785.3],[904.5,787.1],[897.3,787.9],[890.1,787.4],[883.2,785.8],[877.0,782.1],[870.9,778.3],[864.7,774.5],[858.5,770.9],[852.1,767.5],[845.4,765.0],[838.3,764.3],[831.1,764.9],[824.0,766.2],[817.1,768.2],[810.1,770.2],[803.3,772.3],[796.5,774.7],[790.3,778.3],[785.2,783.4],[781.9,789.8],[778.6,796.2],[775.0,802.4],[770.7,808.2],[764.9,812.4],[758.6,815.9],[752.2,819.0],[745.0,819.8],[737.8,819.9],[730.7,819.0],[724.4,815.7],[718.3,811.9],[712.3,807.7],[706.3,803.8],[699.8,800.8],[692.7,799.6],[685.5,800.1],[678.7,802.2],[672.1,805.0],[665.5,807.9],[658.8,810.6],[652.0,813.0],[645.1,815.2],[638.2,817.3],[631.3,819.1],[624.1,820.2],[616.9,820.2],[609.7,820.2],[602.7,821.5],[596.2,824.5],[589.8,827.8],[583.5,831.3],[577.2,834.8],[570.9,838.3],[564.6,841.8],[558.2,845.2],[551.8,848.5],[545.4,851.8],[539.0,855.0],[532.5,858.2],[526.0,861.5],[519.6,864.7],[513.2,868.0],[506.8,871.3],[500.5,874.7],[495.2,879.6],[493.3,886.3],[487.8,890.6],[481.1,893.4],[474.3,896.0],[468.1,899.3],[466.2,906.1],[460.7,910.0],[453.7,911.3],[446.6,912.4],[439.4,913.5],[432.3,914.4],[425.1,915.5],
+];
+const TRACK_EVENTS=[
+  {id:'premiere1923',idx:0,t:0,title:'Première édition — 1923',cat:'record',body:'26-27 mai 1923 — 33 équipages au départ. Victoire Lagache & Léonard (Chenard & Walcker), 2 209 km à 92 km/h de moyenne.'},
+  {id:'bentley1924',idx:0,t:0,title:'Première victoire Bentley',cat:'victoire',body:'1924 — Duff & Clement remportent la 1ère des 5 victoires Bentley. Les "Bentley Boys" deviennent légendaires.'},
+  {id:'departLM',idx:0,t:0,title:'Invention du départ Le Mans',cat:'record',body:'1925 — Sprint des pilotes à travers la piste pour rejoindre leur voiture. Porsche place le contact à gauche sur ses modèles de série pour gagner des dixièmes.'},
+  {id:'crash1927',idx:0,t:0,title:'Crash White House — Bentley n°7',cat:'accident',body:'1927 — Carambolage de 3 Bentley à Maison Blanche. Sammy Davis répare seul sa n°7, reprend la course et gagne avec 20 tours d\'avance.'},
+  {id:'rosier1950',idx:0,t:0,title:'Louis Rosier — 23h30 au volant',cat:'record',body:'1950 — Rosier pilote 23h30 sur 24h. Un hibou brise le pare-brise et le blesse à l\'œil. Seule victoire père-fils de l\'histoire.'},
+  {id:'levegh1952',idx:0,t:0,title:'Levegh — marathon brisé',cat:'record',body:'1952 — Levegh refuse de céder le volant pendant 22h50. En tête de 4 tours, il casse une bielle à 1h10 de l\'arrivée.'},
+  {id:'jaguar1953',idx:0,t:0,title:'Jaguar C-Type — freins à disque',cat:'victoire',body:'1953 — Jaguar équipe ses C-Type de freins à disque Dunlop, innovation venue de l\'aviation. Premier vainqueur à dépasser 4 000 km.'},
+  {id:'catastrophe1955',idx:0,t:0,title:'Catastrophe de 1955',cat:'death',body:'11 juin 1955, 18h26 — La Mercedes 300 SLR de Pierre Levegh explose dans les tribunes. 82+ morts, 120+ blessés. Pire accident du sport auto.'},
+  {id:'memorial1955',idx:0,t:0,title:'Plaque commémorative 1955',cat:'memorial',body:'Mémorial — Plaque en marge du tracé honorant les 82 victimes de 1955. Rappel permanent du prix humain de la compétition.'},
+  {id:'ferrari60_65',idx:0,t:0,title:'Domination Ferrari 1960-65',cat:'victoire',body:'1960-1965 — Six victoires consécutives de Ferrari, record inégalé. Cette hégémonie provoque la guerre Ford vs Ferrari.'},
+  {id:'ford1966',idx:0,t:0,title:'Ford vs Ferrari — photo finish',cat:'victoire',body:'1966 — Triplé GT40. Ken Miles perd la victoire par la règle de la distance, malgré 4 tours d\'avance. Film "Le Mans \'66" (2019).'},
+  {id:'gurney1967',idx:0,t:0,title:'Record 5 000 km — champagne',cat:'record',body:'1967 — Gurney & Foyt couvrent 5 232 km. Gurney invente la tradition du champagne au podium en arrosant la foule.'},
+  {id:'mai68',idx:0,t:0,title:'Report pour Mai 68',cat:'insolite',body:'1968 — Unique édition reportée (septembre). Willy Mairesse ferme mal sa portière au sprint du départ — fin de carrière.'},
+  {id:'ickx1969',idx:0,t:0,title:'Marche de protestation d\'Ickx',cat:'victoire',body:'1969 — Ickx traverse la piste en marchant pour protester. Part dernier, gagne avec 120 m d\'avance. Arrivée la plus serrée de l\'histoire.'},
+  {id:'mcqueen1970',idx:0,t:0,title:'Steve McQueen — film Le Mans',cat:'insolite',body:'1970 — McQueen engage une Porsche 908 équipée de caméras dans la vraie course. Le cascadeur David Piper perd une jambe. Film culte sorti en 1971.'},
+  {id:'record1971',idx:0,t:0,title:'Record de distance — 5 335 km',cat:'record',body:'1971 — Marko & van Lennep parcourent 5 335 km (Porsche 917K). Moyenne 222 km/h. Record imbattable depuis les chicanes de 1990.'},
+  {id:'matra1972',idx:0,t:0,title:'Matra & Graham Hill — Triple Couronne',cat:'victoire',body:'1972 — Matra redonne la victoire à la France. Graham Hill complète la Triple Couronne (Monaco, Indy, Le Mans) — exploit inégalé.'},
+  {id:'newman1979',idx:0,t:0,title:'Paul Newman finit 2e',cat:'insolite',body:'1979 — L\'acteur (54 ans) termine 2e au général en Porsche 935. Meilleure perf d\'un acteur-pilote au Mans.'},
+  {id:'rondeau1980',idx:0,t:0,title:'Rondeau — pilote-constructeur',cat:'victoire',body:'1980 — Jean Rondeau, artisan manceau, gagne au volant de sa propre voiture. Seul pilote-constructeur vainqueur de l\'histoire.'},
+  {id:'gartner1986',idx:0,t:0,title:'Jo Gartner — 1986',cat:'death',body:'1986 — Le pilote autrichien (Porsche 962C) se tue à 260+ km/h sur les Hunaudières. Il avait 32 ans.'},
+  {id:'record405',idx:0,t:0,title:'Record 405 km/h — Dorchy',cat:'record',body:'1988 — Roger Dorchy atteint 407 km/h (annoncé 405 pour la Peugeot 405). Record éternel depuis les chicanes de 1990.'},
+  {id:'mazda1991',idx:0,t:0,title:'Mazda 787B — moteur rotatif',cat:'victoire',body:'1991 — Seule victoire d\'un moteur Wankel et première victoire japonaise. Son rugissement à 10 000 tr/min reste légendaire. Moteurs rotatifs bannis dès 1992.'},
+  {id:'enjolras1997',idx:0,t:0,title:'Sébastien Enjolras — 1997',cat:'death',body:'1997 — Enjolras se tue en essais privés. Sa WR décolle sur les Hunaudières à très haute vitesse.'},
+  {id:'mercedesCLR',idx:0,t:0,title:'Mercedes CLR — Envols 1999',cat:'accident',body:'1999 — 3 Mercedes CLR décollent. Dumbreck catapulté dans les arbres à 300 km/h, miraculeusement indemne. Mercedes se retire.'},
+  {id:'audi2006',idx:0,t:0,title:'Audi R10 — 1ère victoire diesel',cat:'victoire',body:'2006 — L\'Audi R10 TDI (V12 diesel biturbo) gagne. Premier diesel vainqueur. Échappement si propre qu\'un mouchoir reste blanc.'},
+  {id:'recordDist2010',idx:0,t:0,title:'Record distance 5 410 km',cat:'record',body:'2010 — L\'Audi R15 TDI couvre 5 410 km (397 tours). Record moderne de distance.'},
+  {id:'audi2011',idx:0,t:0,title:'Audi R18 — Crashs 2011',cat:'accident',body:'2011 — Rockenfeller détruit son Audi R18 à Indianapolis. Crash spectaculaire, pilote indemne.'},
+  {id:'leenaGade',idx:0,t:0,title:'Leena Gade — 1ère femme ingénieure',cat:'insolite',body:'2011-2014 — Première femme à diriger la stratégie d\'une voiture victorieuse (Audi R18). Trois victoires en quatre ans.'},
+  {id:'toyota2012',idx:0,t:0,title:'Toyota TS030 — Davidson',cat:'accident',body:'2012 — Davidson percuté par une Ferrari, décolle à Indianapolis. Fractures vertébrales, il survit.'},
+  {id:'simonsen2013',idx:0,t:0,title:'Allan Simonsen — 2013',cat:'death',body:'22 juin 2013 — Le Danois (Aston Martin GTE n°95) perd le contrôle au Tertre Rouge. Dernier pilote décédé au Mans.'},
+  {id:'hulk2015',idx:0,t:0,title:'Hülkenberg vainqueur surprise',cat:'victoire',body:'2015 — Le pilote F1 Nico Hülkenberg gagne contre toute attente avec Porsche. "On roulait juste à notre rythme."'},
+  {id:'toyota2016',idx:0,t:0,title:'Toyota heartbreak — dernier tour',cat:'accident',body:'2016 — Toyota en tête à 3 min de l\'arrivée, panne de turbo dans les Hunaudières. Nakajima effondré. Porsche hérite de la victoire.'},
+  {id:'recordKobayashi',idx:0,t:0,title:'Record du tour — Kobayashi',cat:'record',body:'2017 — Kamui Kobayashi (Toyota TS050) : 3\'14"791, 251 km/h de moyenne sur 13,626 km.'},
+  {id:'toyota2018',idx:0,t:0,title:'Toyota + Alonso — enfin !',cat:'victoire',body:'2018 — Après 20 participations, Toyota gagne enfin. Alonso complète la 2e étape de sa Triple Crown.'},
+  {id:'ferrari2023',idx:0,t:0,title:'Ferrari revient — Centenaire',cat:'victoire',body:'2023 — Retour triomphal de Ferrari après 50 ans. La 499P gagne pour le 100e anniversaire. 300 000 spectateurs.'},
+  {id:'ferrari2024',idx:0,t:0,title:'Ferrari doublé — déluge',cat:'victoire',body:'2024 — Ferrari enchaîne sous la pluie. Record de 329 000 spectateurs. 8 constructeurs en Hypercar.'},
+  {id:'kubica2025',idx:0,t:0,title:'Kubica — privé vainqueur',cat:'victoire',body:'2025 — Triplé historique Ferrari. Kubica (1er Polonais) et Ye (1er Chinois) gagnent avec l\'écurie privée AF Corse. 332 000 spectateurs.'},
+  {id:'gpe1',idx:0,t:0,title:'GP Explorer 1 — Squeezie',cat:'gpexplorer',body:'8 oct. 2022 — 1ère course F4 de créateurs. Sylvain Levy (Vilebrequin) vainqueur. Joyca percute le mur à 204 km/h. 1 041 828 viewers Twitch (record FR).'},
+  {id:'gpe2',idx:0,t:0,title:'GP Explorer 2 — Depielo',cat:'gpexplorer',body:'9 sept. 2023 — Depielo gagne. Collision Lanza/Biaggi → cyberharcèlement. 1 300 000 viewers. Gasly et Ocon présents.'},
+  {id:'gpe3',idx:0,t:0,title:'GP Explorer 3 — The Last Race',cat:'gpexplorer',body:'Oct. 2025 — Dernière édition, 3 jours. Karchez (ESP) triplé. Kaatsup 1ère femme sur le podium. 1 373 815 viewers, 200 000 spectateurs.'},
+  {id:'motoGP1969',idx:0,t:0,title:'1er GP Moto au Mans',cat:'moto',body:'1969 — Premier Grand Prix moto au Bugatti. Agostini (MV Agusta) domine avec un tour d\'avance en 500cc.'},
+  {id:'24hMotos1978',idx:0,t:0,title:'1ères 24H Motos',cat:'moto',body:'1978 — L\'ACO crée sa course d\'endurance moto. Chemarin/Léon (Honda RCB) vainqueurs. Départ "type Le Mans" conservé.'},
+  {id:'puig1995',idx:0,t:0,title:'Puig — accident grave',cat:'moto',body:'1995 — Alberto Puig (NSR500) se fracture la jambe à 260 km/h. Circuit retiré du calendrier MotoGP pour travaux de sécurité (1996-1999).'},
+  {id:'rossi2008',idx:0,t:0,title:'Rossi égale Nieto — 90e victoire',cat:'moto',body:'2008 — Rossi égale le record de 90 victoires. Il invite Nieto à piloter sa Yamaha M1 pour le tour d\'honneur.'},
+  {id:'rossiLM2012',idx:0,t:0,title:'Louis Rossi — local victorieux',cat:'moto',body:'2012 — Le Manceau Louis Rossi gagne en Moto3 sous la pluie. Dernière victoire française au Mans jusqu\'à Zarco 2025.'},
+  {id:'bagnaia2023',idx:0,t:0,title:'GP France 2023 — 1000e GP',cat:'moto',body:'2023 — Collision Bagnaia/Viñales, partage de scooter cocasse. 278 805 spectateurs (record MotoGP). 1000e Grand Prix de l\'histoire.'},
+  {id:'zarco2025',idx:0,t:0,title:'Zarco — victoire française',cat:'moto',body:'2025 — Zarco (Honda) : 1er Français en catégorie reine depuis 71 ans. Record absolu : 311 797 spectateurs.'},
+  {id:'delhalle',idx:0,t:0,title:'Hommage Anthony Delhalle',cat:'memorial',body:'2017 — 5x champion du monde d\'endurance moto, décédé en essais à 35 ans. Espace permanent au Musée des 24H.'},
+  {id:'meulebleue',idx:0,t:0,title:'Grand Prix de la Meule Bleue',cat:'insolite',body:'Depuis 2014 — Course de mobylettes vintage (Solex, Vespas) sur le Bugatti. 1 000 cyclomoteurs en 2024. Show de drones et Patrouille de France.'},
+  {id:'classic',idx:0,t:0,title:'Le Mans Classic',cat:'insolite',body:'Depuis 2002 — 800 voitures de course anciennes, 8 500 de collection. Courses jour et nuit. 238 000 spectateurs en 2025. "Little Big Mans" pour les enfants.'},
+  {id:'camions',idx:0,t:0,title:'24 Heures Camions',cat:'insolite',body:'Depuis 1981 — Camions 5+ tonnes, 1 000 ch, limités à 160 km/h sur le Bugatti. 40e édition en 2025. 80 800 spectateurs.'},
+  {id:'roller',idx:0,t:0,title:'24 Heures Roller',cat:'insolite',body:'Depuis 2004 — 4 000 patineurs, 30 nationalités. Record solo : 950 km (Stievenart, 2017). Entrée gratuite.'},
+  {id:'velo',idx:0,t:0,title:'24 Heures Vélo',cat:'insolite',body:'Depuis 2009 — Record : 1 071 km (256 tours). La "Bosse du Dunlop" (7 %) est redoutée. Bernard Hinault a participé.'},
+  {id:'monument',idx:0,t:0,title:'Monument préféré des Français',cat:'insolite',body:'Sept. 2024 — Le circuit élu Monument préféré des Français (France 3), devant le beffroi de Douai. 1er circuit automobile.'},
+  {id:'wright',idx:0,t:0,title:'Vols de Wilbur Wright',cat:'insolite',body:'1908 — Avant les voitures, la route des Hunaudières a accueilli les premiers vols publics de Wilbur Wright en France.'},
+  {id:'parade',idx:0,t:0,title:'Grande Parade des Pilotes',cat:'insolite',body:'Annuel — Défilé solennel dans le centre-ville du Mans. 4,4 km, 500 bénévoles, dizaines de milliers de spectateurs.'},
+  {id:'f1unique',idx:0,t:0,title:'Unique GP de F1 au Mans',cat:'insolite',body:'2 juil. 1967 — Brabham gagne devant 20 000 personnes. Les pilotes jugent le Bugatti "sans caractère". Jamais revenu.'},
+  {id:'hunaudieres',idx:0,t:0,title:'Ligne droite des Hunaudières',cat:'landmark',body:'6 km légendaires — Plus longue ligne droite au monde. 407 km/h en 1988. Route D338 ouverte au public hors course. 2 chicanes ajoutées en 1990.'},
+  {id:'chicanes1990',idx:0,t:0,title:'Chicanes Hunaudières — 1990',cat:'landmark',body:'1990 — La FIA impose 2 chicanes (Daytona et Michelin), limitant la vitesse à ~330 km/h au lieu de 400+.'},
+  {id:'mulsanneCorner',idx:0,t:0,title:'Virage de Mulsanne',cat:'landmark',body:'Depuis 1923 — Freinage le plus violent : 300→75 km/h. La nuit, les disques rougeoyants offrent un spectacle hypnotisant.'},
+  {id:'indianapolis',idx:0,t:0,title:'Virage d\'Indianapolis',cat:'landmark',body:'Inchangé depuis 1923 — Seule portion originale du circuit. Envol de Dumbreck (1999). Jo Bonnier tué en 1972.'},
+  {id:'arnage',idx:0,t:0,title:'Virage d\'Arnage',cat:'landmark',body:'Point le plus lent — 80 km/h. Spectateurs à quelques mètres. Quasi inchangé en 100 ans. Bentley a nommé un modèle d\'après ce virage.'},
+  {id:'tertreRouge',idx:0,t:0,title:'Tertre Rouge',cat:'landmark',body:'Virage clé — Relie la partie permanente aux Hunaudières. Sol rougeâtre. Reprofilé après l\'accident Simonsen (2013).'},
+  {id:'passerelle',idx:0,t:0,title:'Passerelle Dunlop',cat:'landmark',body:'Depuis 1950 — "La Tour Eiffel du circuit." Forme de pneu iconique. Bosse de 7 % (point culminant). McNish tonneau en 2011. Rebaptisée Goodyear en 2026.'},
+  {id:'porsche1972',idx:0,t:0,title:'Virages Porsche',cat:'landmark',body:'1972 — Remplacent Maison Blanche. Enchaînement le plus technique : "Section préférée de nombreux pilotes" (ACO).'},
+  {id:'fordchicane',idx:0,t:0,title:'Chicane Ford',cat:'landmark',body:'1968 — Financée par Henry Ford II. Ralentit les voitures avant les tribunes. 110-130 km/h.'},
+  {id:'chapelle',idx:0,t:0,title:'La Chapelle',cat:'landmark',body:'Bifurcation Sarthe/Bugatti — Chapelle en cèdre rouge (2011, 5 m²). Vitrail avec une Bugatti des années 1920. Messe annuelle pendant les 24H.'},
+  {id:'esses',idx:0,t:0,title:'Esses de la Forêt',cat:'landmark',body:'Créées en 1932 — Pins disparus depuis. Les pilotes y sont prudents (pneus froids). De nuit, plongée dans l\'obscurité totale.'},
+  {id:'karting',idx:0,t:0,title:'Virage du Karting',cat:'landmark',body:'Zone accidentogène — Dernière courbe avant Ford. Seul banking du circuit actuel. Rénové en 2017.'},
+  {id:'bugatti',idx:0,t:0,title:'Circuit Bugatti',cat:'landmark',body:'Depuis 1965 — 4,185 km. Accueille MotoGP, 24H Motos, GP Explorer. Partage stands et Dunlop avec le grand circuit.'},
+  {id:'musee',idx:0,t:0,title:'Musée des 24H (futur M24)',cat:'landmark',body:'Depuis 1961 — 140+ véhicules historiques. En rénovation 2025-2026, réouverture mai 2026 sous le nom "M24" (10 000 m²).'},
+];
+
+
+const CAT_LABELS = {"death": "D\u00e9c\u00e8s", "accident": "Accidents", "record": "Records", "victoire": "Victoires", "moto": "Moto", "gpexplorer": "GP Explorer", "insolite": "Insolite", "landmark": "Lieux", "memorial": "M\u00e9morial"};
+const CAT_COLORS_3D = {"death": "#e85040", "accident": "#e8a040", "record": "#c8a94e", "victoire": "#50b860", "moto": "#40c8d8", "gpexplorer": "#d850a0", "insolite": "#80c850", "landmark": "#4a9fd4", "memorial": "#9b6fc0"};
+const CAT_NAMES_3D = {"death": "D\u00e9c\u00e8s", "accident": "Accidents", "record": "Records", "victoire": "Victoires", "moto": "Moto", "gpexplorer": "GP Explorer", "insolite": "Insolite", "landmark": "Lieux", "memorial": "M\u00e9morial"};
+
+let scene3d, camera3d, renderer3d, is3D = false;
+let carMesh, trackLine;
+let currentEventIdx = -1, currentT = 0;
+let animating = false, animStart = 0, animFromT = 0, animToT = 0, animDur = 3000;
+
+const S = 0.08;
+function to3D(svgX, svgY) { return [(svgX - 700) * S, 0, -(svgY - 500) * S]; }
+
+function init3D() {
+  if (scene3d) return;
+  if (typeof THREE === 'undefined') {
+    // THREE.js still loading - show loading state and retry
+    const container = document.getElementById('view3d');
+    if (!container.querySelector('.loading-msg')) {
+      container.innerHTML = '<div class="loading-msg" style="color:#c8a94e;padding:40px;font-family:Oswald,sans-serif;font-size:18px;text-align:center;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">Chargement du moteur 3D…</div>';
+    }
+    setTimeout(init3D, 200);
+    return;
+  }
+  // Check WebGL support
+  try {
+    const testCanvas = document.createElement('canvas');
+    const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+    if (!gl) throw new Error('No WebGL');
+  } catch(e) {
+    document.getElementById('view3d').innerHTML = '<div style="color:#e85040;padding:40px;font-family:Oswald,sans-serif;font-size:18px;text-align:center">Erreur : WebGL n\'est pas disponible.<br><small style="color:#888">Activez l\'accélération matérielle dans les paramètres de votre navigateur.</small></div>';
+    return;
+  }
+  const container = document.getElementById('view3d');
+  // Force container dimensions via inline style
+  container.style.width = window.innerWidth + 'px';
+  container.style.height = window.innerHeight + 'px';
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  scene3d = new THREE.Scene();
+  scene3d.fog = new THREE.FogExp2(0x050608, 0.012);
+  camera3d = new THREE.PerspectiveCamera(65, W / H, 0.1, 500);
+  renderer3d = new THREE.WebGLRenderer({ antialias: true, alpha: false, failIfMajorPerformanceCaveat: false });
+  renderer3d.setSize(W, H);
+  renderer3d.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer3d.setClearColor(0x050608);
+  renderer3d.domElement.style.display = 'block';
+  renderer3d.domElement.style.width = '100%';
+  renderer3d.domElement.style.height = '100%';
+  container.appendChild(renderer3d.domElement);
+
+  // Ground grid (sparse for performance)
+  const gridPts = [];
+  for (let i = -200; i <= 200; i += 8) {
+    gridPts.push(-200, -0.5, i, 200, -0.5, i);
+    gridPts.push(i, -0.5, -200, i, -0.5, 200);
+  }
+  const gridGeo = new THREE.BufferGeometry();
+  gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPts, 3));
+  scene3d.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({ color: 0x151820, transparent: true, opacity: 0.4 })));
+
+  // Track
+  const trackPts3D = TRACK_PTS.map(p => new THREE.Vector3(...to3D(p[0], p[1])));
+  trackPts3D.push(trackPts3D[0].clone());
+  const curve = new THREE.CatmullRomCurve3(trackPts3D, false);
+  const tubePts = curve.getPoints(400);
+  scene3d.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tubePts), new THREE.LineBasicMaterial({ color: 0xc8a94e, transparent: true, opacity: 0.7 })));
+  const roadW = 0.6;
+  [roadW, -roadW].forEach(w => {
+    const edgePts = [];
+    for (let i = 0; i < tubePts.length; i++) {
+      const next = tubePts[(i + 1) % tubePts.length];
+      const dir = new THREE.Vector3().subVectors(next, tubePts[i]).normalize();
+      edgePts.push(tubePts[i].clone().add(new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(w)));
+    }
+    scene3d.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePts), new THREE.LineBasicMaterial({ color: 0x3a3530, transparent: true, opacity: 0.6 })));
+  });
+
+  // Event markers (stored for filtering)
+  window._markers3D = [];
+  TRACK_EVENTS.forEach(ev => {
+    const evObj = EVENTS.find(e => e.id === ev.id);
+    if (!evObj) return;
+    const pos = to3D(evObj.x, evObj.y);
+    const col = new THREE.Color(CAT_COLORS_3D[ev.cat]);
+    const group = new THREE.Group();
+    group.userData = {cat: ev.cat, id: ev.id};
+    const beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(pos[0],0,pos[2]), new THREE.Vector3(pos[0],6,pos[2])]);
+    group.add(new THREE.Line(beamGeo, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 })));
+    const diamond = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), new THREE.MeshBasicMaterial({ color: col, wireframe: true }));
+    diamond.position.set(pos[0], 6, pos[2]);
+    group.add(diamond);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.8, 12), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.3, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(pos[0], 0.02, pos[2]);
+    group.add(ring);
+    scene3d.add(group);
+    window._markers3D.push(group);
+  });
+
+  // LMP1 Car (solid faces + edge outlines)
+  const carGroup = new THREE.Group();
+  const bodyMat = new THREE.MeshBasicMaterial({ color: 0xc8a94e });
+  const darkMat = new THREE.MeshBasicMaterial({ color: 0x1a1810 });
+  const wheelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x8a7a40 });
+
+  // Main body
+  const bodyGeo = new THREE.BoxGeometry(0.7, 0.25, 1.8);
+  carGroup.add(new THREE.Mesh(bodyGeo, bodyMat));
+  carGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), edgeMat));
+
+  // Cockpit (dark)
+  const cockGeo = new THREE.BoxGeometry(0.4, 0.18, 0.5);
+  const cockMesh = new THREE.Mesh(cockGeo, darkMat);
+  cockMesh.position.set(0, 0.21, -0.1);
+  carGroup.add(cockMesh);
+
+  // Nose (removed - caused visible yellow diamond artifact)
+
+  // Rear wing
+  const wingGeo = new THREE.BoxGeometry(0.85, 0.04, 0.12);
+  const wingMesh = new THREE.Mesh(wingGeo, bodyMat);
+  wingMesh.position.set(0, 0.42, 0.88);
+  carGroup.add(wingMesh);
+  const wingEdge = new THREE.LineSegments(new THREE.EdgesGeometry(wingGeo), edgeMat);
+  wingEdge.position.set(0, 0.42, 0.88);
+  carGroup.add(wingEdge);
+
+  // Wing endplates
+  [-0.42, 0.42].forEach(x => {
+    const epGeo = new THREE.BoxGeometry(0.02, 0.15, 0.14);
+    const ep = new THREE.Mesh(epGeo, bodyMat);
+    ep.position.set(x, 0.37, 0.88);
+    carGroup.add(ep);
+  });
+
+  // Wing supports
+  [-0.3, 0.3].forEach(x => {
+    const pGeo = new THREE.BoxGeometry(0.03, 0.28, 0.03);
+    const pillar = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: 0x555040 }));
+    pillar.position.set(x, 0.26, 0.88);
+    carGroup.add(pillar);
+  });
+
+  // Wheels (dark cylinders)
+  const wheelGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.14, 8);
+  [[-0.44,0.08,-0.6],[0.44,0.08,-0.6],[-0.44,0.08,0.6],[0.44,0.08,0.6]].forEach(p => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI/2; w.position.set(...p);
+    carGroup.add(w);
+  });
+
+  // Headlights removed (yellow dot artifact)
+
+  // Tail lights (red)
+  [-0.25, 0.25].forEach(x => {
+    const tl = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), new THREE.MeshBasicMaterial({color:0xff2020}));
+    tl.position.set(x, 0.15, 0.92);
+    carGroup.add(tl);
+  });
+  carGroup.position.set(...to3D(TRACK_PTS[0][0], TRACK_PTS[0][1]));
+  carGroup.position.y = 0.15;
+  carMesh = carGroup;
+  scene3d.add(carMesh);
+
+  // === MOTO MESH (hidden initially) ===
+  const motoGroup = new THREE.Group();
+  const motoMat = new THREE.MeshBasicMaterial({ color: 0x60e8f0 });
+  const motoDark = new THREE.MeshBasicMaterial({ color: 0x222828 });
+  const motoEdge = new THREE.LineBasicMaterial({ color: 0x40a0a8 });
+  // Body frame
+  const motoBody = new THREE.BoxGeometry(0.3, 0.35, 1.6);
+  const motoBodyMesh = new THREE.Mesh(motoBody, motoMat);
+  motoGroup.add(motoBodyMesh);
+  motoGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(motoBody), motoEdge));
+  // Front wheel
+  const motoWheelGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 10);
+  const fw = new THREE.Mesh(motoWheelGeo, motoDark);
+  fw.rotation.z = Math.PI/2; fw.position.set(0, -0.05, -0.7);
+  motoGroup.add(fw);
+  // Rear wheel
+  const rw = new THREE.Mesh(motoWheelGeo, motoDark);
+  rw.rotation.z = Math.PI/2; rw.position.set(0, -0.05, 0.6);
+  motoGroup.add(rw);
+  // Fairing (front)
+  const fairGeo = new THREE.BoxGeometry(0.25, 0.4, 0.5);
+  const fair = new THREE.Mesh(fairGeo, motoMat);
+  fair.position.set(0, 0.2, -0.5);
+  motoGroup.add(fair);
+  motoGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(fairGeo), motoEdge));
+  // Rider body
+  const riderGeo = new THREE.BoxGeometry(0.25, 0.45, 0.55);
+  const rider = new THREE.Mesh(riderGeo, motoDark);
+  rider.position.set(0, 0.4, 0);
+  motoGroup.add(rider);
+  // Rider helmet
+  const helmetGeo = new THREE.SphereGeometry(0.14, 6, 6);
+  const helmet = new THREE.Mesh(helmetGeo, motoMat);
+  helmet.position.set(0, 0.65, -0.15);
+  motoGroup.add(helmet);
+  // Tail
+  const tailGeo = new THREE.BoxGeometry(0.2, 0.15, 0.45);
+  const tail = new THREE.Mesh(tailGeo, motoMat);
+  tail.position.set(0, 0.12, 0.7);
+  motoGroup.add(tail);
+  // Red tail light
+  const mtl = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), new THREE.MeshBasicMaterial({color:0xff2020}));
+  mtl.position.set(0, 0.14, 0.94);
+  motoGroup.add(mtl);
+
+  motoGroup.visible = false;
+  motoGroup.position.copy(carGroup.position);
+  scene3d.add(motoGroup);
+  window._motoMesh = motoGroup;
+  window._currentVehicle = 'car'; // Track current vehicle type
+
+  scene3d.add(new THREE.AmbientLight(0x404040));
+  buildTrackCurve();
+  refreshGeoEvents();
+
+  window.addEventListener('resize', () => {
+    if (!renderer3d) return;
+    const w2 = window.innerWidth, h2 = window.innerHeight;
+    camera3d.aspect = w2/h2; camera3d.updateProjectionMatrix(); renderer3d.setSize(w2,h2);
+  });
+
+  currentT = 0; currentEventIdx = -1;
+  // Snap camera to start
+  const initP = trackCurve.getPointAt(0);
+  const initN = trackCurve.getPointAt(0.003);
+  const initTravel = Math.atan2(initN.x-initP.x, initN.z-initP.z);
+  carMesh.rotation.y = initTravel + Math.PI;
+  camera3d.position.set(initP.x-Math.sin(initTravel)*4.5, 2.2, initP.z-Math.cos(initTravel)*4.5);
+  camera3d.lookAt(initP.x+Math.sin(initTravel)*2, 0.3, initP.z+Math.cos(initTravel)*2);
+  positionCarAt(0);
+  animate3D();
+  startTour3D();
+}
+
+// Pre-compute smooth CatmullRom curve for car movement
+let trackCurve;
+
+function buildTrackCurve() {
+  const pts3d = TRACK_PTS.map(p => new THREE.Vector3(...to3D(p[0], p[1])));
+  pts3d.reverse(); // Reverse to match real racing direction
+  trackCurve = new THREE.CatmullRomCurve3(pts3d, true, 'catmullrom', 0.5);
+  // Also compute nearest track point index for each event
+  TRACK_EVENTS.forEach(ev => {
+    const evObj = EVENTS.find(e => e.id === ev.id);
+    if (!evObj) return;
+    const target = new THREE.Vector3(...to3D(evObj.x, evObj.y));
+    let bestIdx = 0, bestD = Infinity;
+    for(let i = 0; i < pts3d.length; i++) {
+      const d = pts3d[i].distanceToSquared(target);
+      if(d < bestD) { bestD = d; bestIdx = i; }
+    }
+    ev.idx = bestIdx;
+  });
+  // Recompute event t values on the reversed curve
+  const N = 2000;
+  const samples = [];
+  for(let i = 0; i <= N; i++) samples.push(trackCurve.getPointAt(i/N));
+  TRACK_EVENTS.forEach(ev => {
+    const evObj = EVENTS.find(e => e.id === ev.id);
+    if (!evObj) return;
+    const target = new THREE.Vector3(...to3D(evObj.x, evObj.y));
+    let bestT = 0, bestD = Infinity;
+    for(let i = 0; i <= N; i++) {
+      const d = samples[i].distanceToSquared(target);
+      if(d < bestD) { bestD = d; bestT = i/N; }
+    }
+    ev.t = bestT;
+  });
+  // Re-sort events by t for correct visit order
+  TRACK_EVENTS.sort((a,b) => a.t - b.t);
+}
+
+// Get the real 3D position of an event (may be off-track)
+function getEventPos3D(ev) {
+  const evObj = EVENTS.find(e => e.id === ev.id);
+  if (!evObj) return null;
+  return new THREE.Vector3(...to3D(evObj.x, evObj.y));
+}
+
+// Check if event is off-track by comparing SVG coords to raw TRACK_PTS
+// Uses SVG pixel distance (more reliable than 3D curve distance)
+function isOffTrack(ev) {
+  const evObj = EVENTS.find(e => e.id === ev.id);
+  if (!evObj) return false;
+  let minD = Infinity;
+  for (let i = 0; i < TRACK_PTS.length; i++) {
+    const dx = evObj.x - TRACK_PTS[i][0];
+    const dy = evObj.y - TRACK_PTS[i][1];
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < minD) minD = d;
+  }
+  return minD > 12; // 12 SVG pixels ~ marker is visually off the track line
+}
+
+// Smooth camera target (avoids jerky lookAt)
+let _camLookTarget = {x:0, y:0.3, z:0};
+
+function positionCarAtPoint(px, pz, lookX, lookZ) {
+  carMesh.position.set(px, 0.15, pz);
+  if(window._motoMesh) window._motoMesh.position.set(px, 0.15, pz);
+  const travelYaw = Math.atan2(lookX - px, lookZ - pz);
+  let targetCarYaw = travelYaw + Math.PI;
+  let diff = targetCarYaw - carMesh.rotation.y;
+  while(diff > Math.PI) diff -= 2*Math.PI;
+  while(diff < -Math.PI) diff += 2*Math.PI;
+  carMesh.rotation.y += diff * 0.08;
+  if(window._motoMesh) window._motoMesh.rotation.y = carMesh.rotation.y;
+  // Very smooth camera follow
+  const lF = 0.035;
+  const camTargetX = px - Math.sin(travelYaw) * 5;
+  const camTargetZ = pz - Math.cos(travelYaw) * 5;
+  camera3d.position.x += (camTargetX - camera3d.position.x) * lF;
+  camera3d.position.y += (2.5 - camera3d.position.y) * lF;
+  camera3d.position.z += (camTargetZ - camera3d.position.z) * lF;
+  // Smooth lookAt target
+  const lookTX = px + Math.sin(travelYaw) * 2;
+  const lookTZ = pz + Math.cos(travelYaw) * 2;
+  _camLookTarget.x += (lookTX - _camLookTarget.x) * lF * 1.5;
+  _camLookTarget.z += (lookTZ - _camLookTarget.z) * lF * 1.5;
+  camera3d.lookAt(_camLookTarget.x, 0.3, _camLookTarget.z);
+}
+
+function positionCarAt(t01) {
+  // t01 is 0..1 along the full track loop
+  const pt = trackCurve.getPointAt(t01 % 1);
+  const ptAhead = trackCurve.getPointAt((t01 + 0.003) % 1);
+  positionCarAtPoint(pt.x, pt.z, ptAhead.x, ptAhead.z);
+}
+
+// Detour animation state
+let detourAnim = null;
+let isDetouring = false;
+function animateDetour(fromX, fromZ, toX, toZ, duration, onDone) {
+  isDetouring = true;
+  // Scale duration by distance (min 1.5s, proportional, max 4s)
+  const dist = Math.sqrt((toX-fromX)**2 + (toZ-fromZ)**2);
+  const dur = Math.max(1500, Math.min(4000, dist * 600));
+  const t0 = performance.now();
+  const travelYaw = Math.atan2(toX - fromX, toZ - fromZ);
+  function step(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    // Very smooth ease (quintic)
+    const ease = p < 0.5 ? 16*p*p*p*p*p : 1 - Math.pow(-2*p+2, 5)/2;
+    const cx = fromX + (toX - fromX) * ease;
+    const cz = fromZ + (toZ - fromZ) * ease;
+    // Use positionCarAtPoint for consistent smooth camera
+    positionCarAtPoint(cx, cz, cx + (toX-fromX)*0.1, cz + (toZ-fromZ)*0.1);
+    if (p < 1) detourAnim = requestAnimationFrame(step);
+    else { detourAnim = null; isDetouring = false; if (onDone) onDone(); }
+  }
+  if (detourAnim) cancelAnimationFrame(detourAnim);
+  detourAnim = requestAnimationFrame(step);
+}
+
+let speedKmh = 0;
+
+function animate3D() {
+  if (!is3D) return;
+  requestAnimationFrame(animate3D);
+  if (animating && !isDetouring && tourMode3D !== 'anecdotes') {
+    const elapsed = performance.now() - animStart;
+    const rawT = Math.min(elapsed / animDur, 1);
+    const ease = rawT < 0.5 ? 4*rawT*rawT*rawT : 1-Math.pow(-2*rawT+2,3)/2;
+    let totalDist = animToT - animFromT;
+    if (totalDist <= 0) totalDist += 1;
+    currentT = (animFromT + ease * totalDist) % 1;
+    positionCarAt(currentT);
+    const e2t = Math.min((elapsed+16)/animDur,1);
+    const e2 = e2t<0.5?4*e2t*e2t*e2t:1-Math.pow(-2*e2t+2,3)/2;
+    speedKmh = Math.min(380, Math.max(0, Math.floor(Math.abs(e2-ease)*totalDist*500*18)));
+    if (rawT >= 1) {
+      animating=false; currentT=animToT%1; positionCarAt(currentT); speedKmh=0;
+      showEventCard3D(currentEventIdx); updateNavButtons();
+    }
+  }
+  document.getElementById('speed-val').textContent = speedKmh;
+  let nearC='', nearD=999;
+  TRACK_EVENTS.forEach(e => { const d=Math.abs(e.t-currentT); const dw=Math.min(d,1-d); if(dw<nearD){nearD=dw;nearC=e.title;} });
+  if(nearD<0.06) document.getElementById('corner-name').textContent = nearC;
+  document.getElementById('progress3d').style.width = ((filtered3DIdx+1)/filtered3D.length*100)+'%';
+  renderer3d.render(scene3d, camera3d);
+}
+
+
+function switchVehicle(type) {
+  if (window._currentVehicle === type) return;
+  window._currentVehicle = type;
+  const car = carMesh;
+  const moto = window._motoMesh;
+  if (!moto) return;
+  if (type === 'moto') {
+    car.visible = false;
+    moto.visible = true;
+  } else {
+    car.visible = true;
+    moto.visible = false;
+  }
+}
+
+function showEventCard3D(evIdx) {
+  const trackEv = TRACK_EVENTS[evIdx]; if(!trackEv) return;
+  // Get the full event object (with img, link, category, etc.)
+  const fullEv = EVENTS.find(e => e.id === trackEv.id) || trackEv;
+  switchVehicle(trackEv.cat === 'moto' ? 'moto' : 'car');
+  const card = document.getElementById('card3d');
+  document.getElementById('title3d').textContent = fullEv.title;
+  // Build rich body with media carousel (same as 2D panel)
+  let bodyHtml = '';
+  if (typeof buildMediaHTML === 'function') {
+    bodyHtml += buildMediaHTML(fullEv);
+  }
+  bodyHtml += '<div style="margin:12px 0">' + (fullEv.body || '') + '</div>';
+  if (fullEv.link) {
+    const linkLabel = fullEv.link.includes('wikipedia.org') ? 'Wikipedia' : new URL(fullEv.link).hostname.replace('www.','');
+    bodyHtml += `<a class="panel-link" href="${fullEv.link}" target="_blank" rel="noopener">↗ En savoir plus — ${linkLabel}</a>`;
+  }
+  const body = document.getElementById('body3d');
+  body.innerHTML = bodyHtml;
+  body.scrollTop = 0;
+  // Wire up carousel dots if present
+  const carousel = document.getElementById('mc_' + fullEv.id);
+  if (carousel) {
+    const slides = carousel.querySelector('.slides');
+    const dots = carousel.querySelectorAll('.dot-ind');
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        slides.scrollTo({left: parseInt(dot.dataset.i) * slides.offsetWidth, behavior: 'smooth'});
+      });
+    });
+    slides.addEventListener('scroll', () => {
+      const idx = Math.round(slides.scrollLeft / slides.offsetWidth);
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    });
+  }
+  const badge = document.getElementById('badge3d');
+  badge.textContent = CAT_NAMES_3D[trackEv.cat];
+  badge.style.background = CAT_COLORS_3D[trackEv.cat]+'25';
+  badge.style.color = CAT_COLORS_3D[trackEv.cat];
+  card.classList.remove('show'); void card.offsetWidth; card.classList.add('show');
+  // If auto tour is active, schedule next event
+  if (typeof scheduleAutoAdvance === 'function') scheduleAutoAdvance();
+}
+
+// Events that are geographically on the circuit (same filter as 2D map)
+// Matches EVENT_GPS entries with lon >= 0.201 (the rest are in left columns or start line cluster)
+const GEO_EVENT_IDS = new Set([
+  'departLM','catastrophe1955','memorial1955','ickx1969','levegh1952','record1971',
+  'passerelle','bugatti','chapelle','esses','tertreRouge','simonsen2013','mcqueen1970',
+  'mercedesCLR','hunaudieres','chicanes1990','wright','record405','gartner1986',
+  'gurney1967','enjolras1997','toyota2016','crash1927','mulsanneCorner','indianapolis',
+  'audi2011','toyota2012','arnage','porsche1972','matra1972','fordchicane','karting','f1unique'
+]);
+// Only events that are truly on the circuit (for the 3D lap)
+// These are rebuilt/sorted after buildTrackCurve() via refreshGeoEvents()
+let TRACK_EVENTS_GEO = TRACK_EVENTS.filter(e => GEO_EVENT_IDS.has(e.id));
+// The remaining events are "anecdotes" (no precise location on the map)
+let TRACK_EVENTS_OFF = TRACK_EVENTS.filter(e => !GEO_EVENT_IDS.has(e.id));
+function refreshGeoEvents() {
+  // Sort geo events by their t position on the track curve (racing order)
+  TRACK_EVENTS_GEO = TRACK_EVENTS.filter(e => GEO_EVENT_IDS.has(e.id)).sort((a,b) => a.t - b.t);
+  TRACK_EVENTS_OFF = TRACK_EVENTS.filter(e => !GEO_EVENT_IDS.has(e.id));
+}
+
+// Filtered events list for 3D (respects activeFilter from 2D)
+let tourMode3D = 'circuit'; // 'circuit' or 'anecdotes'
+let filtered3D = TRACK_EVENTS_GEO;
+let filtered3DIdx = -1;
+
+function rebuildFiltered3D() {
+  const source = tourMode3D === 'circuit' ? TRACK_EVENTS_GEO : TRACK_EVENTS_OFF;
+  if (activeFilter === 'all') {
+    filtered3D = source;
+  } else {
+    filtered3D = source.filter(e => e.cat === activeFilter);
+  }
+  filtered3DIdx = -1;
+  // Show/hide 3D markers (only geo events have 3D markers)
+  if (window._markers3D) {
+    window._markers3D.forEach(g => {
+      const isGeo = GEO_EVENT_IDS.has(g.userData.id);
+      // In circuit mode, only geo markers visible. In anecdotes mode, hide all geo markers.
+      const modeOk = tourMode3D === 'circuit' ? isGeo : false;
+      const catOk = activeFilter === 'all' || g.userData.cat === activeFilter;
+      g.visible = modeOk && catOk;
+    });
+  }
+}
+
+// Anecdotes rail: a straight line in 3D space where the car drives through event beacons
+const ANECDOTE_SPACING = 10; // 3D units between each anecdote beacon
+let anecdotesRail = null;
+let anecdotesBeacons = []; // list of {mesh, beam, z, eventId}
+let anecdotesCarZ = 0; // current Z position of the car on the rail
+let anecdotesAnim = null; // active animation request id
+
+function buildAnecdotesRail() {
+  if (anecdotesRail) return;
+  anecdotesRail = new THREE.Group();
+  // Long straight line (rail)
+  const total = Math.max(40, TRACK_EVENTS_OFF.length) * ANECDOTE_SPACING;
+  const railPts = [new THREE.Vector3(0, 0.01, -20), new THREE.Vector3(0, 0.01, total + 20)];
+  anecdotesRail.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(railPts),
+    new THREE.LineBasicMaterial({color:0xc8a94e,transparent:true,opacity:0.6})
+  ));
+  // Lane edges
+  [-0.9, 0.9].forEach(x => {
+    const pts = [new THREE.Vector3(x, 0.01, -20), new THREE.Vector3(x, 0.01, total + 20)];
+    anecdotesRail.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({color:0xc8a94e,transparent:true,opacity:0.2})
+    ));
+  });
+  // Dashed center markers every ANECDOTE_SPACING
+  for (let z = 0; z < total; z += ANECDOTE_SPACING / 2) {
+    const g = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.02, z - 0.8),
+      new THREE.Vector3(0, 0.02, z + 0.8),
+    ]);
+    anecdotesRail.add(new THREE.Line(g, new THREE.LineBasicMaterial({color:0xc8a94e,transparent:true,opacity:0.3})));
+  }
+  // One beacon per anecdote event, ALL on the centerline (x = 0)
+  anecdotesBeacons = [];
+  TRACK_EVENTS_OFF.forEach((ev, idx) => {
+    const col = new THREE.Color(CAT_COLORS_3D[ev.cat] || '#c8a94e');
+    const x = 0;
+    const z = (idx + 1) * ANECDOTE_SPACING;
+    // Beacon floating above the car height so it doesn't hide the car
+    const mesh = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.55),
+      new THREE.MeshBasicMaterial({color:col,wireframe:true})
+    );
+    mesh.position.set(x, 3.5, z);
+    anecdotesRail.add(mesh);
+    // Beam from ground to beacon (thin vertical)
+    const beam = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 3.5, z),
+      ]),
+      new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0.5})
+    );
+    anecdotesRail.add(beam);
+    // Ring on the ground (wider so car passes through)
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.2, 1.5, 24),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.4,side:THREE.DoubleSide})
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.03, z);
+    anecdotesRail.add(ring);
+    anecdotesBeacons.push({mesh, beam, ring, z, x, eventId: ev.id});
+  });
+  anecdotesRail.visible = false;
+  scene3d.add(anecdotesRail);
+}
+
+function positionCarOnRail(z, snap) {
+  anecdotesCarZ = z;
+  carMesh.position.set(0, 0.15, z);
+  carMesh.rotation.y = 0;
+  if (window._motoMesh) {
+    window._motoMesh.position.set(0, 0.15, z);
+    window._motoMesh.rotation.y = 0;
+  }
+  // Camera behind the car — snap on first placement, then smooth lerp
+  const targetX = 0, targetY = 2.8, targetZ = z - 6;
+  if (snap) {
+    camera3d.position.set(targetX, targetY, targetZ);
+  } else {
+    const lF = 0.15;
+    camera3d.position.x += (targetX - camera3d.position.x) * lF;
+    camera3d.position.y += (targetY - camera3d.position.y) * lF;
+    camera3d.position.z += (targetZ - camera3d.position.z) * lF;
+  }
+  camera3d.lookAt(0, 0.5, z + 12);
+}
+
+function animateCarOnRail(fromZ, toZ, duration, onDone) {
+  if (anecdotesAnim) cancelAnimationFrame(anecdotesAnim);
+  const t0 = performance.now();
+  function step(now) {
+    const p = Math.min((now - t0) / duration, 1);
+    const ease = p < 0.5 ? 4*p*p*p : 1 - Math.pow(-2*p+2, 3)/2;
+    const z = fromZ + (toZ - fromZ) * ease;
+    positionCarOnRail(z);
+    if (p < 1) anecdotesAnim = requestAnimationFrame(step);
+    else { anecdotesAnim = null; if (onDone) onDone(); }
+  }
+  anecdotesAnim = requestAnimationFrame(step);
+}
+
+function setAnecdotesMode(active) {
+  if (!scene3d) return;
+  if (active) {
+    buildAnecdotesRail();
+    anecdotesRail.visible = true;
+    // Hide circuit markers
+    if (window._markers3D) window._markers3D.forEach(g => g.visible = false);
+    // Start car at rail origin (snap camera to avoid jump from circuit view)
+    positionCarOnRail(0, true);
+  } else {
+    if (anecdotesRail) anecdotesRail.visible = false;
+    if (anecdotesAnim) { cancelAnimationFrame(anecdotesAnim); anecdotesAnim = null; }
+    // Restore markers per filter
+    if (window._markers3D) {
+      window._markers3D.forEach(g => {
+        const isGeo = GEO_EVENT_IDS.has(g.userData.id);
+        const catOk = activeFilter === 'all' || g.userData.cat === activeFilter;
+        g.visible = isGeo && catOk;
+      });
+    }
+  }
+}
+
+function toggleTourMode3D() {
+  stopAutoTour3D();
+  // Cancel any pending animations
+  animating = false;
+  if (detourAnim) { cancelAnimationFrame(detourAnim); detourAnim = null; isDetouring = false; }
+  if (anecdotesAnim) { cancelAnimationFrame(anecdotesAnim); anecdotesAnim = null; }
+  tourMode3D = tourMode3D === 'circuit' ? 'anecdotes' : 'circuit';
+  const btn = document.getElementById('btn-mode3d');
+  if (btn) btn.textContent = tourMode3D === 'circuit' ? 'CIRCUIT' : 'ANECDOTES';
+  rebuildFiltered3D();
+  setAnecdotesMode(tourMode3D === 'anecdotes');
+  filtered3DIdx = -1;
+  // In anecdotes mode, reset car to rail origin
+  if (tourMode3D === 'anecdotes') {
+    positionCarOnRail(0);
+  }
+  // Start with the first event (with animation)
+  if (filtered3D.length > 0) {
+    advance3D();
+  } else {
+    updateNavButtons();
+  }
+}
+
+function updateNavButtons() {
+  const prevBtn = document.getElementById('btn-prev3d');
+  const nextBtn = document.getElementById('btn-next3d');
+  const counter = document.getElementById('nav-counter3d');
+  if(prevBtn) prevBtn.disabled = (filtered3DIdx <= 0);
+  if(nextBtn) nextBtn.disabled = (filtered3DIdx >= filtered3D.length - 1);
+  if(counter) counter.textContent = (filtered3DIdx + 1) + ' / ' + filtered3D.length;
+}
+
+function prev3D() {
+  if(animating || filtered3DIdx <= 0) return;
+  if (detourAnim) { cancelAnimationFrame(detourAnim); detourAnim = null; isDetouring = false; }
+  filtered3DIdx--;
+  const ev = filtered3D[filtered3DIdx];
+  currentEventIdx = TRACK_EVENTS.indexOf(ev);
+  // Anecdotes mode: animate car back along the rail
+  if (tourMode3D === 'anecdotes') {
+    const beacon = anecdotesBeacons.find(b => b.eventId === ev.id);
+    if (beacon) {
+      animating = true;
+      animateCarOnRail(anecdotesCarZ, beacon.z, 1000, () => {
+        animating = false;
+        showEventCard3D(currentEventIdx);
+        updateNavButtons();
+      });
+    } else {
+      showEventCard3D(currentEventIdx);
+      updateNavButtons();
+    }
+    return;
+  }
+  currentT = ev.t;
+  speedKmh = 0;
+  positionCarAt(currentT);
+  showEventCard3D(currentEventIdx);
+  updateNavButtons();
+}
+
+// Auto tour 3D state
+let autoTour3D = false;
+let autoTourTimeout = null;
+let autoTourPausedByHover = false; // paused because mouse is on the card
+let autoTourSpeed = 1; // 1x, 2x, 4x
+const AUTO_PAUSE_MS = 5000; // base pause at 1x speed
+
+// Pause auto tour when mouse is on the card (or a media is playing)
+(function initCardHoverPause(){
+  const card = document.getElementById('card3d');
+  if (!card) return;
+  function pauseAuto() {
+    if (autoTour3D) {
+      autoTourPausedByHover = true;
+      if (autoTourTimeout) { clearTimeout(autoTourTimeout); autoTourTimeout = null; }
+    }
+  }
+  function resumeAuto() {
+    if (autoTour3D && autoTourPausedByHover) {
+      autoTourPausedByHover = false;
+      scheduleAutoAdvance();
+    }
+  }
+  card.addEventListener('mouseenter', pauseAuto);
+  card.addEventListener('mouseleave', resumeAuto);
+  // Touch: pause on touchstart, resume on touchend outside
+  card.addEventListener('touchstart', pauseAuto, {passive:true});
+  // When a YouTube iframe is loaded (user clicked play), keep paused
+  card.addEventListener('click', e => {
+    if (e.target.closest('.yt-placeholder') || e.target.tagName === 'IFRAME') {
+      pauseAuto();
+    }
+  }, true);
+})();
+
+function toggleAutoTour3D() {
+  autoTour3D = !autoTour3D;
+  const btn = document.getElementById('btn-play3d');
+  if (btn) btn.textContent = autoTour3D ? '⏸' : '⏵';
+  if (autoTour3D) {
+    // Force reset any stuck state and start tour
+    if (autoTourTimeout) { clearTimeout(autoTourTimeout); autoTourTimeout = null; }
+    // If no event yet shown, start with the first one
+    if (filtered3DIdx < 0) {
+      // Force advance even if animating was true from a stale state
+      animating = false;
+      if (detourAnim) { cancelAnimationFrame(detourAnim); detourAnim = null; isDetouring = false; }
+      advance3D();
+    } else {
+      // Schedule the next advance from current position
+      scheduleAutoAdvance();
+    }
+  } else if (autoTourTimeout) {
+    clearTimeout(autoTourTimeout);
+    autoTourTimeout = null;
+  }
+}
+
+function cycleAutoSpeed3D() {
+  autoTourSpeed = autoTourSpeed === 1 ? 2 : autoTourSpeed === 2 ? 4 : 1;
+  const btn = document.getElementById('btn-speed3d');
+  if (btn) btn.textContent = autoTourSpeed + '×';
+}
+
+function scheduleAutoAdvance() {
+  if (autoTourTimeout) clearTimeout(autoTourTimeout);
+  if (!autoTour3D || autoTourPausedByHover) return;
+  autoTourTimeout = setTimeout(() => {
+    if (!autoTour3D || !is3D || autoTourPausedByHover) return;
+    // If at last event, stop
+    if (filtered3DIdx >= filtered3D.length - 1) {
+      toggleAutoTour3D();
+      return;
+    }
+    advance3D();
+  }, AUTO_PAUSE_MS / autoTourSpeed);
+}
+
+function stopAutoTour3D() {
+  if (autoTour3D) {
+    autoTour3D = false;
+    const btn = document.getElementById('btn-play3d');
+    if (btn) btn.textContent = '⏵';
+  }
+  if (autoTourTimeout) { clearTimeout(autoTourTimeout); autoTourTimeout = null; }
+}
+
+function advance3D() {
+  if(animating) return;
+  if(filtered3DIdx >= filtered3D.length-1) { updateNavButtons(); return; }
+  if (detourAnim) { cancelAnimationFrame(detourAnim); detourAnim = null; isDetouring = false; }
+
+  // Anecdotes mode: animate car along the linear rail between beacons
+  if (tourMode3D === 'anecdotes') {
+    filtered3DIdx++;
+    const ev = filtered3D[filtered3DIdx];
+    currentEventIdx = TRACK_EVENTS.indexOf(ev);
+    document.getElementById('card3d').classList.remove('show');
+    // Find the beacon z position for this event
+    const beacon = anecdotesBeacons.find(b => b.eventId === ev.id);
+    if (beacon) {
+      animating = true;
+      speedKmh = 180;
+      animateCarOnRail(anecdotesCarZ, beacon.z, 1600, () => {
+        animating = false;
+        speedKmh = 0;
+        showEventCard3D(currentEventIdx);
+        updateNavButtons();
+      });
+    } else {
+      showEventCard3D(currentEventIdx);
+      updateNavButtons();
+    }
+    return;
+  }
+
+  filtered3DIdx++;
+  const ev = filtered3D[filtered3DIdx];
+  currentEventIdx = TRACK_EVENTS.indexOf(ev);
+  document.getElementById('card3d').classList.remove('show');
+
+  animFromT = currentT;
+  animToT = ev.t;
+  let dist = animToT - animFromT;
+  if(dist < 0) dist += 1;
+
+  // For very close points, snap to position
+  if(dist < 0.005) {
+    currentT = ev.t;
+    positionCarAt(currentT);
+    speedKmh = 0;
+    showEventCard3D(currentEventIdx);
+    updateNavButtons();
+    return;
+  }
+
+  // Duration scales with distance, minimum 2s for short hops
+  animDur = Math.max(2000, dist * 12000);
+  animStart = performance.now();
+  animating = true; speedKmh = 200;
+}
+
+function startTour3D() {
+  // Reset to circuit mode when entering 3D
+  tourMode3D = 'circuit';
+  const mbtn = document.getElementById('btn-mode3d');
+  if (mbtn) mbtn.textContent = 'CIRCUIT';
+  rebuildFiltered3D();
+  if (typeof setAnecdotesMode === 'function') setAnecdotesMode(false);
+  currentEventIdx=-1; currentT=0; animating=false; speedKmh=0;
+  window._currentVehicle = null;
+  switchVehicle('car');
+  positionCarAt(0); animate3D();
+
+  // If a 2D event was selected, jump directly to it
+  if (window._selected2DEvent) {
+    const targetId = window._selected2DEvent;
+    window._selected2DEvent = null;
+    const idx = TRACK_EVENTS.findIndex(e => e.id === targetId);
+    const fidx = filtered3D.findIndex(e => e.id === targetId);
+    if (idx >= 0) {
+      currentEventIdx = idx;
+      filtered3DIdx = fidx >= 0 ? fidx : 0;
+      const ev = TRACK_EVENTS[idx];
+      currentT = ev.t;
+      positionCarAt(currentT);
+      // Snap camera immediately
+      const pt = trackCurve.getPointAt(currentT % 1);
+      const ptA = trackCurve.getPointAt((currentT + 0.003) % 1);
+      const yaw = Math.atan2(ptA.x-pt.x, ptA.z-pt.z);
+      camera3d.position.set(pt.x-Math.sin(yaw)*4.5, 2.2, pt.z-Math.cos(yaw)*4.5);
+      camera3d.lookAt(pt.x+Math.sin(yaw)*2, 0.3, pt.z+Math.cos(yaw)*2);
+      carMesh.rotation.y = yaw + Math.PI;
+      if(window._motoMesh) window._motoMesh.rotation.y = carMesh.rotation.y;
+      speedKmh = 0;
+      showEventCard3D(idx);
+      updateNavButtons();
+      return;
+    }
+  }
+
+  document.getElementById('card3d').classList.remove('show');
+  document.getElementById('title3d').textContent = 'Circuit de la Sarthe';
+  document.getElementById('body3d').innerHTML = 'Bienvenue sur le circuit des 24 Heures du Mans. Parcourez les 13,626 km du tracé et découvrez les événements marquants de son histoire.';
+  const b = document.getElementById('badge3d'); b.textContent='13.626 KM'; b.style.background='rgba(200,169,78,0.2)'; b.style.color='#c8a94e';
+  setTimeout(() => document.getElementById('card3d').classList.add('show'), 100);
+  updateNavButtons();
+}
+
+function toggle3D() {
+  try {
+  // Close satellite view if active
+  is3D = !is3D;
+  const v3d = document.getElementById('view3d');
+  v3d.classList.toggle('active', is3D);
+  document.getElementById('hud3d').classList.toggle('active', is3D);
+  document.getElementById('speed-display').classList.toggle('active', is3D);
+  document.getElementById('btn-back3d').classList.toggle('active', is3D);
+  const btn = document.getElementById('btn3d');
+  btn.style.display = is3D ? 'none' : '';
+  document.getElementById('btn-sat').style.display = is3D ? 'none' : '';
+  // Hide timeline in 3D mode
+  const tl = document.getElementById('timeline');
+  if (tl) tl.style.display = is3D ? 'none' : '';
+  if (is3D && satActive) toggleSat();
+  if (!is3D) stopAutoTour3D();
+  if(is3D) {
+    // Force container to be visible and sized BEFORE init
+    v3d.style.display = 'block';
+    v3d.style.width = '100vw';
+    v3d.style.height = '100vh';
+    v3d.style.position = 'fixed';
+    v3d.style.top = '0';
+    v3d.style.left = '0';
+    v3d.style.zIndex = '9999';
+    // Use setTimeout to ensure the browser has painted the container
+    setTimeout(() => {
+      try {
+        if (scene3d && renderer3d) {
+          // Re-entering 3D mode - just resize and restart tour
+          const w = window.innerWidth, h = window.innerHeight;
+          camera3d.aspect = w / h;
+          camera3d.updateProjectionMatrix();
+          renderer3d.setSize(w, h);
+          startTour3D();
+          animate3D();
+        } else {
+          // First init - init3D will call startTour3D when ready
+          init3D();
+        }
+      } catch(err) { console.error('3D init error:', err); }
+    }, 50);
+  } else {
+    animating=false;
+    v3d.style.display = '';
+  }
+  } catch(err) { console.error('toggle3D error:', err); }
+}
+
+document.addEventListener('keydown', e => {
+  if(!is3D) return;
+  if(e.code==='Space'||e.code==='Enter'||e.code==='ArrowRight'){e.preventDefault();advance3D();}
+  if(e.code==='ArrowLeft'){e.preventDefault();prev3D();}
+  if(e.code==='Escape') toggle3D();
+});
+document.getElementById('view3d').addEventListener('click', e => {
+  if(!e.target.closest('.event-card')&&!e.target.closest('#nav3d-buttons')&&!e.target.closest('#btn-back3d')&&!e.target.closest('button')) advance3D();
+});
+
+// ===== MAIN MAP (Leaflet — always visible) =====
+let satMap = null;
+let satActive = false;
+let satMarkers = [];
+let satTileLayer = null;
+let darkTileLayer = null;
+
+const CIRCUIT_GPS_FULL = [[47.9526555,0.2076815],[47.9527758,0.2076921],[47.9528953,0.2077073],[47.9529642,0.2077164],[47.9530494,0.2077314],[47.9531409,0.207747],[47.9532565,0.2077702],[47.9533572,0.2077942],[47.9534978,0.20783],[47.9536546,0.2078759],[47.953945,0.2079667],[47.9540314,0.207997],[47.9541588,0.2080424],[47.9542951,0.2080976],[47.9544572,0.2081687],[47.9546283,0.2082516],[47.9547879,0.2083361],[47.9549259,0.208419],[47.9550693,0.2085027],[47.9551805,0.208572],[47.9552277,0.2086052],[47.9552688,0.2086372],[47.9553039,0.2086658],[47.9553393,0.2086963],[47.9553703,0.2087245],[47.9554103,0.2087638],[47.9554507,0.2088059],[47.9554968,0.208856],[47.9555439,0.2089127],[47.9555891,0.208972],[47.9556209,0.2090177],[47.9556466,0.2090552],[47.9556716,0.2090936],[47.9556922,0.2091283],[47.9557278,0.209193],[47.9557578,0.2092523],[47.955823,0.2093975],[47.95644,0.2109034],[47.9564488,0.2109231],[47.956456,0.2109384],[47.9564611,0.2109485],[47.9564664,0.2109579],[47.9564715,0.2109666],[47.956478,0.2109764],[47.9564853,0.2109863],[47.9564916,0.2109943],[47.9564982,0.2110013],[47.9565052,0.211008],[47.9565123,0.2110133],[47.9565196,0.2110184],[47.9565262,0.2110229],[47.9565323,0.2110266],[47.9565385,0.2110301],[47.9565454,0.2110333],[47.9565523,0.2110361],[47.9565585,0.2110381],[47.9565646,0.21104],[47.9565711,0.2110417],[47.9565781,0.2110432],[47.9565858,0.2110443],[47.9565933,0.211045],[47.9566007,0.2110455],[47.9566093,0.2110454],[47.9566174,0.2110446],[47.9566241,0.2110436],[47.9566322,0.2110417],[47.9566404,0.2110392],[47.9566512,0.2110353],[47.9566701,0.2110286],[47.9569452,0.2109329],[47.9569543,0.2109302],[47.9569629,0.210928],[47.9569701,0.2109264],[47.9569787,0.2109248],[47.9569877,0.2109237],[47.9569977,0.2109231],[47.9570056,0.2109229],[47.9570116,0.210923],[47.9570197,0.2109233],[47.9570277,0.2109242],[47.9570365,0.2109255],[47.9570439,0.210927],[47.95705,0.2109286],[47.9570568,0.210931],[47.9570629,0.2109339],[47.9570691,0.2109373],[47.957075,0.2109405],[47.9570812,0.2109443],[47.9570891,0.2109496],[47.9570972,0.210955],[47.9571038,0.2109599],[47.9571103,0.2109655],[47.9571166,0.2109714],[47.9571234,0.2109781],[47.9571308,0.2109855],[47.9571377,0.210993],[47.9571438,0.2110003],[47.9571497,0.2110075],[47.9571548,0.2110143],[47.9571597,0.2110208],[47.9571655,0.2110294],[47.9571699,0.2110362],[47.9571739,0.2110431],[47.9571775,0.2110495],[47.9571824,0.211059],[47.9571893,0.2110742],[47.9577202,0.2123152],[47.9578028,0.2125102],[47.9578848,0.2127024],[47.9579416,0.2128319],[47.9579848,0.2129219],[47.9580246,0.2129969],[47.9580671,0.21307],[47.9581048,0.21313],[47.9581453,0.2131887],[47.958188,0.2132459],[47.9582243,0.2132896],[47.9582649,0.2133349],[47.9583095,0.2133816],[47.9584908,0.2135691],[47.9586823,0.2137648],[47.958742,0.2138306],[47.9587894,0.213892],[47.9588295,0.2139483],[47.9588748,0.2140161],[47.9589094,0.2140718],[47.9589504,0.2141415],[47.9589722,0.2141814],[47.9589879,0.2142119],[47.9590024,0.2142446],[47.9590164,0.2142785],[47.9590288,0.2143079],[47.9590377,0.2143303],[47.9590456,0.2143518],[47.9590498,0.2143649],[47.9591013,0.2145186],[47.9591487,0.214674],[47.9591714,0.2147547],[47.9591918,0.2148272],[47.9592046,0.2148771],[47.9592209,0.2149422],[47.9592321,0.2149931],[47.9592419,0.2150415],[47.9592527,0.2151033],[47.9592624,0.2151685],[47.9592697,0.2152264],[47.9592744,0.215283],[47.9592837,0.2154316],[47.9592918,0.2156372],[47.9593026,0.2160412],[47.9593099,0.2163361],[47.9593134,0.2164766],[47.9593173,0.2166316],[47.9593246,0.2167286],[47.9593293,0.2167824],[47.9593347,0.2168328],[47.9593407,0.216877],[47.9593472,0.2169146],[47.9593541,0.2169488],[47.9593607,0.2169776],[47.9593691,0.2170071],[47.9593795,0.2170386],[47.959393,0.2170748],[47.9594087,0.2171124],[47.9594281,0.217154],[47.9594456,0.2171897],[47.9594644,0.217225],[47.959486,0.2172617],[47.9595111,0.2173015],[47.9595307,0.217331],[47.9595527,0.2173584],[47.9595737,0.2173838],[47.9595962,0.2174099],[47.9596207,0.217434],[47.9596469,0.2174568],[47.95967,0.2174761],[47.959697,0.2174966],[47.9597275,0.2175168],[47.9597566,0.2175352],[47.9597849,0.2175528],[47.9598154,0.2175704],[47.9598399,0.2175831],[47.9598635,0.217594],[47.9598823,0.2176005],[47.9598998,0.2176052],[47.9599165,0.2176093],[47.9599277,0.217611],[47.9599374,0.2176119],[47.9599574,0.2176127],[47.9599872,0.2176135],[47.9600232,0.2176146],[47.9601161,0.2176157],[47.9601416,0.2176166],[47.9601658,0.2176186],[47.9601926,0.2176213],[47.9602155,0.217624],[47.9602366,0.2176271],[47.9602602,0.2176319],[47.9602863,0.2176376],[47.9603115,0.2176441],[47.9603333,0.2176508],[47.9603618,0.2176604],[47.9603846,0.2176699],[47.9604084,0.217681],[47.9604348,0.217694],[47.9604581,0.2177058],[47.9604834,0.2177192],[47.9605025,0.2177304],[47.9605224,0.2177424],[47.960543,0.2177559],[47.9605598,0.2177677],[47.9605787,0.2177824],[47.9605959,0.2177977],[47.9606155,0.2178165],[47.960632,0.2178338],[47.9606469,0.2178513],[47.9606593,0.2178677],[47.9606724,0.2178865],[47.9606901,0.2179139],[47.9607053,0.217939],[47.9607166,0.2179577],[47.9607271,0.217975],[47.960741,0.2179989],[47.9607544,0.2180223],[47.9607688,0.2180482],[47.9607869,0.2180813],[47.9609775,0.2184487],[47.9610906,0.2186728],[47.9611425,0.2187784],[47.9611901,0.2188778],[47.9612202,0.2189441],[47.9612458,0.2190078],[47.9612644,0.2190562],[47.96128,0.2190985],[47.9612933,0.2191357],[47.961316,0.219202],[47.9613592,0.2193274],[47.9613917,0.2194282],[47.961426,0.2195449],[47.9614537,0.219644],[47.9614919,0.2197922],[47.9618414,0.2211776],[47.9618552,0.2212401],[47.961866,0.221306],[47.9618719,0.2213732],[47.9618722,0.2214309],[47.9618672,0.2214975],[47.9618594,0.2215553],[47.9618462,0.2216173],[47.9618231,0.2216998],[47.9617856,0.2218015],[47.9617189,0.2219795],[47.9616537,0.2221559],[47.9615962,0.2223014],[47.9615356,0.2224436],[47.9614759,0.2225857],[47.9614193,0.2227165],[47.9613556,0.2228593],[47.9612858,0.2230122],[47.9612406,0.2231141],[47.9612327,0.2231307],[47.9611945,0.2232107],[47.9611101,0.2233842],[47.9610632,0.223473],[47.9610149,0.2235588],[47.9609577,0.2236526],[47.9608993,0.2237471],[47.9608221,0.2238705],[47.9607853,0.2239289],[47.9607699,0.2239508],[47.9607471,0.2239858],[47.960724,0.2240194],[47.9606648,0.2241132],[47.9606134,0.2241863],[47.9605342,0.2242856],[47.9604503,0.2243855],[47.9603695,0.2244793],[47.9602851,0.2245813],[47.9601884,0.2246919],[47.959737,0.2251184],[47.9587716,0.2260264],[47.9582366,0.2265375],[47.957933,0.2268118],[47.9577869,0.2269347],[47.9576767,0.2270244],[47.9575726,0.2271075],[47.9574614,0.2271909],[47.9573105,0.2272979],[47.9571571,0.2274013],[47.9569696,0.2275149],[47.9567478,0.2276399],[47.9550347,0.2284678],[47.954966,0.228501],[47.9530353,0.2294196],[47.9516723,0.2300759],[47.9507139,0.2305373],[47.9502138,0.2307774],[47.948507,0.2315967],[47.9481411,0.2317767],[47.9480454,0.2318228],[47.946505,0.2325625],[47.9451051,0.2332311],[47.9432732,0.2341138],[47.9426304,0.2344274],[47.9432732,0.2341138],[47.9433588,0.2340652],[47.9434091,0.2340351],[47.9434479,0.2340091],[47.9434914,0.2339771],[47.94352,0.2339542],[47.9435462,0.2339314],[47.9435715,0.2339077],[47.9435918,0.2338871],[47.9436168,0.2338589],[47.9436407,0.2338274],[47.9436647,0.2337959],[47.9436921,0.2337562],[47.9437164,0.2337195],[47.9437376,0.2336859],[47.9437547,0.2336577],[47.943812,0.2335599],[47.9439976,0.2332408],[47.9440779,0.2331059],[47.9440862,0.2330925],[47.9440984,0.2330732],[47.9441137,0.2330501],[47.9441247,0.2330342],[47.944133,0.2330231],[47.9441425,0.2330114],[47.9441503,0.233002],[47.9441573,0.2329938],[47.9441639,0.2329866],[47.9441703,0.2329805],[47.944178,0.2329738],[47.9441857,0.2329677],[47.9441914,0.2329633],[47.9441977,0.2329587],[47.9442055,0.2329529],[47.9442143,0.2329471],[47.9442232,0.2329414],[47.944233,0.2329358],[47.9442424,0.2329309],[47.9442513,0.2329271],[47.9442612,0.2329229],[47.9442707,0.2329192],[47.9442799,0.2329161],[47.9442912,0.232913],[47.944303,0.2329102],[47.9443143,0.2329076],[47.9443241,0.2329057],[47.9443349,0.2329036],[47.944344,0.2329019],[47.9443529,0.2329004],[47.944362,0.2328992],[47.9443714,0.2328982],[47.9443812,0.2328975],[47.9443896,0.2328972],[47.9443968,0.232897],[47.9444042,0.232897],[47.9444113,0.2328974],[47.9444195,0.2328979],[47.9444272,0.2328987],[47.9444353,0.2329001],[47.9444434,0.2329016],[47.9444512,0.2329031],[47.9444584,0.2329046],[47.9444667,0.2329064],[47.944475,0.2329083],[47.9444821,0.2329099],[47.9444885,0.2329116],[47.9444965,0.2329138],[47.944504,0.2329161],[47.944513,0.2329192],[47.9445213,0.2329224],[47.9445294,0.2329257],[47.9445367,0.2329291],[47.9445439,0.2329329],[47.9445513,0.2329371],[47.9445575,0.2329411],[47.9445639,0.2329457],[47.9445704,0.2329508],[47.9445764,0.2329555],[47.944582,0.2329604],[47.9445874,0.2329651],[47.9445931,0.2329703],[47.9445987,0.2329753],[47.9446039,0.2329802],[47.944609,0.2329849],[47.944613,0.2329893],[47.9446169,0.2329936],[47.9446209,0.2329985],[47.944717,0.2331183],[47.944723,0.2331251],[47.9447328,0.2331358],[47.944746,0.2331495],[47.944755,0.2331583],[47.9447599,0.233163],[47.9447752,0.2331758],[47.9447906,0.2331872],[47.9448083,0.2331999],[47.9448244,0.2332104],[47.9448412,0.2332198],[47.9448592,0.2332296],[47.9448784,0.2332383],[47.9448887,0.2332424],[47.9448997,0.2332461],[47.9449111,0.2332487],[47.9449205,0.2332504],[47.9449307,0.2332518],[47.9449418,0.2332531],[47.9449504,0.2332533],[47.9449606,0.2332529],[47.9449735,0.2332522],[47.9449898,0.2332508],[47.945011,0.2332481],[47.9450322,0.2332448],[47.9450637,0.2332383],[47.9451051,0.2332311],[47.9426304,0.2344274],[47.94101,0.2352013],[47.9409377,0.2352415],[47.9386357,0.2363559],[47.9366862,0.2372929],[47.9363089,0.2374729],[47.9337498,0.2386937],[47.9290747,0.2409418],[47.9288311,0.2410589],[47.9284765,0.2412308],[47.9284611,0.2412426],[47.9284489,0.2412526],[47.9284385,0.2412625],[47.9284294,0.2412721],[47.928419,0.241284],[47.9284127,0.2412919],[47.9284085,0.241298],[47.9284048,0.2413033],[47.9283993,0.2413126],[47.9283917,0.2413254],[47.9283846,0.2413376],[47.9283769,0.2413515],[47.9283647,0.2413729],[47.9283507,0.241398],[47.9283339,0.24143],[47.9283206,0.2414574],[47.9283077,0.2414871],[47.9282954,0.2415174],[47.9282847,0.2415445],[47.9282768,0.2415678],[47.9282686,0.2415944],[47.9282599,0.2416308],[47.9282452,0.2416981],[47.9282163,0.2418369],[47.9282108,0.2418654],[47.9282033,0.2418973],[47.9281957,0.2419253],[47.9281878,0.2419512],[47.9281791,0.2419772],[47.9281703,0.2420006],[47.928162,0.2420199],[47.9281511,0.2420419],[47.9281397,0.2420627],[47.9281246,0.2420859],[47.9281074,0.2421101],[47.9280933,0.2421297],[47.9280781,0.2421496],[47.9280612,0.2421678],[47.9280452,0.2421848],[47.9280302,0.2422],[47.9280146,0.2422134],[47.9279991,0.2422244],[47.9279834,0.2422337],[47.9279633,0.2422439],[47.9279415,0.2422536],[47.9279181,0.2422618],[47.9278994,0.2422665],[47.9278793,0.2422701],[47.9278564,0.2422722],[47.9278342,0.2422726],[47.9278183,0.242272],[47.9278032,0.2422699],[47.9277879,0.2422675],[47.9277647,0.242263],[47.9277435,0.2422583],[47.9277228,0.2422524],[47.9277013,0.2422451],[47.9273767,0.2421062],[47.9273186,0.2420823],[47.9272623,0.2420625],[47.9272387,0.2420543],[47.9272201,0.2420491],[47.9272022,0.2420446],[47.9271837,0.2420404],[47.9271621,0.2420357],[47.9271421,0.2420328],[47.9271222,0.2420308],[47.9270993,0.2420285],[47.927075,0.2420259],[47.9270505,0.2420233],[47.9270271,0.2420217],[47.927005,0.242021],[47.9269812,0.242021],[47.9269518,0.2420202],[47.9269184,0.2420215],[47.9268923,0.2420244],[47.9268698,0.2420277],[47.9268482,0.2420318],[47.9268276,0.2420371],[47.9268078,0.2420432],[47.9267849,0.2420512],[47.9266899,0.2420913],[47.9252216,0.2428002],[47.9250738,0.2428669],[47.9249851,0.2429008],[47.9248844,0.2429366],[47.9247898,0.2429688],[47.9246825,0.2429963],[47.9245815,0.2430201],[47.9244656,0.2430454],[47.9243407,0.243066],[47.9242209,0.2430794],[47.9232464,0.2431736],[47.9187062,0.2435767],[47.9149906,0.2438741],[47.9149101,0.2438717],[47.9148396,0.2438664],[47.9147645,0.2438577],[47.9147164,0.243851],[47.9146634,0.2438429],[47.9146185,0.2438349],[47.9145798,0.2438262],[47.914543,0.2438154],[47.9145039,0.2438013],[47.9144473,0.2437779],[47.9143707,0.2437473],[47.9135689,0.2434183],[47.9135188,0.2433932],[47.9134949,0.2433736],[47.9134781,0.2433512],[47.9134618,0.2433169],[47.9134488,0.2432827],[47.9134385,0.2432468],[47.9134327,0.2432106],[47.9134284,0.2431739],[47.9134279,0.2431367],[47.9134322,0.2430967],[47.9134402,0.2430499],[47.9135308,0.2425749],[47.9136401,0.2419784],[47.9137015,0.2416432],[47.9150431,0.2342976],[47.9151072,0.233976],[47.9151477,0.2337964],[47.9151849,0.2336456],[47.9152273,0.233488],[47.9152739,0.2333271],[47.9153931,0.2329628],[47.9162716,0.2304023],[47.9170933,0.2280071],[47.9171891,0.2277287],[47.9173683,0.2272134],[47.9174266,0.2270603],[47.917487,0.2269134],[47.9175505,0.2267689],[47.9176175,0.2266258],[47.9179561,0.2259409],[47.9180459,0.2257567],[47.9187978,0.2242406],[47.9191102,0.2236104],[47.9194134,0.2230009],[47.919617,0.2225963],[47.919951,0.2219715],[47.920484,0.2210005],[47.9205204,0.2209379],[47.9205666,0.2208583],[47.9206348,0.2207564],[47.9206927,0.2206726],[47.9207559,0.2205948],[47.9208285,0.2205224],[47.9209107,0.2204596],[47.9209799,0.2204131],[47.9210839,0.2203613],[47.9213973,0.2202198],[47.9217436,0.2200564],[47.9220521,0.2199109],[47.9221245,0.2198725],[47.9221579,0.219852],[47.9221905,0.2198267],[47.9222175,0.2198013],[47.9222425,0.2197744],[47.9222672,0.2197409],[47.9222899,0.2197007],[47.9223104,0.2196566],[47.9223277,0.2196093],[47.9223409,0.219564],[47.9223496,0.2195211],[47.9223566,0.2194711],[47.9223605,0.2194128],[47.9223581,0.2193477],[47.9223525,0.2192803],[47.9223432,0.219216],[47.9223246,0.2191249],[47.9223045,0.2190391],[47.92201,0.2178976],[47.9214609,0.2158056],[47.9214544,0.2157752],[47.9214508,0.2157529],[47.9214482,0.2157277],[47.9214483,0.2157055],[47.9214502,0.2156806],[47.9214523,0.2156624],[47.9214543,0.2156478],[47.9214576,0.2156314],[47.921461,0.2156153],[47.9214649,0.2156019],[47.9214693,0.2155878],[47.9214744,0.2155734],[47.9214809,0.2155596],[47.9214887,0.2155472],[47.9214967,0.2155355],[47.9215074,0.2155228],[47.9215168,0.2155138],[47.9215277,0.2155044],[47.921542,0.2154937],[47.9215721,0.2154755],[47.9216584,0.2154438],[47.9218212,0.2153837],[47.9260093,0.2139097],[47.926221,0.2138255],[47.9263301,0.2137775],[47.9264407,0.2137269],[47.9265544,0.2136682],[47.9266615,0.2136082],[47.9267707,0.2135413],[47.9268773,0.2134695],[47.9269838,0.2133944],[47.9270932,0.2133136],[47.9287512,0.2120577],[47.9289562,0.2119071],[47.9291802,0.2117465],[47.9294804,0.2115357],[47.9299829,0.211179],[47.9301259,0.2110687],[47.9302293,0.2109885],[47.9303475,0.2108888],[47.9304446,0.2108017],[47.9305314,0.2107169],[47.9306537,0.2105946],[47.9308279,0.2104184],[47.9309644,0.2102632],[47.931142,0.2100685],[47.9312869,0.2099065],[47.9314656,0.2097304],[47.9316138,0.2095919],[47.9317203,0.2094962],[47.9318137,0.2094178],[47.9319155,0.209337],[47.9320658,0.2092226],[47.9322813,0.2090683],[47.9336234,0.2095819],[47.9342349,0.2104279],[47.9336234,0.2095819],[47.9335765,0.2095184],[47.9335287,0.2094567],[47.9334901,0.2094045],[47.9334283,0.2093358],[47.933375,0.2092827],[47.9332997,0.2092216],[47.9332434,0.2091785],[47.9331787,0.2091337],[47.9331092,0.2090939],[47.9330412,0.2090582],[47.9329682,0.20903],[47.9328918,0.2090088],[47.9328155,0.2089965],[47.9327222,0.2089882],[47.9326245,0.2089887],[47.9325374,0.2089929],[47.9324508,0.2090076],[47.9323748,0.2090281],[47.9322813,0.2090683],[47.9342349,0.2104279],[47.9342841,0.2104884],[47.934327,0.2105369],[47.9343757,0.2105884],[47.9344082,0.2106211],[47.9344415,0.2106512],[47.9344674,0.2106732],[47.9345167,0.2107092],[47.9345614,0.2107406],[47.9346116,0.210772],[47.9346702,0.2108027],[47.934732,0.2108297],[47.9347879,0.2108507],[47.9348431,0.210868],[47.9348977,0.2108799],[47.9349531,0.2108891],[47.9350007,0.2108956],[47.9351349,0.21089],[47.9352922,0.2108712],[47.9356983,0.2108203],[47.9359723,0.2107801],[47.9360909,0.2107546],[47.9361889,0.2107277],[47.9362751,0.2106929],[47.9363808,0.2106433],[47.936428,0.2106084],[47.9364749,0.2105711],[47.9365128,0.2105356],[47.9365405,0.2105063],[47.936566,0.2104762],[47.9365941,0.2104434],[47.9366208,0.2104106],[47.936674,0.2103415],[47.9367486,0.2102315],[47.9368034,0.2101444],[47.9370055,0.209783],[47.9370526,0.2097062],[47.9370966,0.209627],[47.9371308,0.2095704],[47.9371634,0.2095217],[47.9371954,0.2094793],[47.9372227,0.2094456],[47.9372529,0.2094104],[47.9372848,0.2093768],[47.9373225,0.2093381],[47.9373575,0.209303],[47.9373892,0.2092733],[47.9374239,0.2092426],[47.9374616,0.2092097],[47.9374992,0.209179],[47.9375328,0.2091535],[47.9375651,0.209132],[47.9375974,0.2091114],[47.9376315,0.2090918],[47.9376705,0.209072],[47.9377123,0.2090555],[47.9377515,0.2090419],[47.937797,0.2090282],[47.9378486,0.2090163],[47.937897,0.2090066],[47.9379446,0.2089993],[47.9379848,0.208995],[47.9380301,0.2089906],[47.938078,0.2089876],[47.9381163,0.2089867],[47.938153,0.2089879],[47.9381922,0.2089907],[47.9382306,0.2089957],[47.9382694,0.2090022],[47.9383093,0.2090101],[47.93835,0.2090204],[47.9383907,0.2090325],[47.9384329,0.2090465],[47.9384706,0.2090613],[47.9385079,0.2090791],[47.9385469,0.2090994],[47.938595,0.2091277],[47.9386336,0.2091527],[47.9386695,0.2091785],[47.9387087,0.2092093],[47.9387439,0.209239],[47.9387833,0.2092745],[47.9388208,0.2093105],[47.9388538,0.2093439],[47.9388835,0.209376],[47.9389106,0.2094086],[47.9389398,0.2094439],[47.9389639,0.2094751],[47.9389865,0.2095055],[47.9390165,0.2095461],[47.939042,0.2095844],[47.9390677,0.2096247],[47.9390959,0.2096724],[47.9391431,0.2097578],[47.9393413,0.2100998],[47.9393848,0.2101703],[47.9394271,0.210232],[47.9394584,0.2102717],[47.9394918,0.210309],[47.9395319,0.2103492],[47.9395732,0.2103855],[47.9396151,0.2104187],[47.9396613,0.210452],[47.9397133,0.2104825],[47.9397597,0.2105058],[47.9398111,0.2105284],[47.9398512,0.2105446],[47.9398881,0.2105564],[47.9399211,0.2105658],[47.9399551,0.2105728],[47.9399874,0.2105765],[47.940024,0.2105779],[47.9400733,0.2105758],[47.940133,0.2105708],[47.9401937,0.2105626],[47.9402666,0.2105509],[47.9403403,0.2105369],[47.9406059,0.210481],[47.9410901,0.2103771],[47.9416698,0.2102422],[47.9417423,0.210228],[47.941789,0.2102204],[47.9418275,0.2102168],[47.9418694,0.2102136],[47.9419387,0.2102137],[47.9419993,0.2102167],[47.9420512,0.2102217],[47.9421033,0.2102305],[47.9422004,0.2102513],[47.9425186,0.2103264],[47.942569,0.2103371],[47.9426236,0.2103475],[47.9426911,0.2103578],[47.9427554,0.2103647],[47.9428508,0.2103712],[47.9428975,0.2103713],[47.9429485,0.2103681],[47.9429823,0.210363],[47.9430226,0.210355],[47.943074,0.2103403],[47.9431228,0.2103252],[47.9432332,0.2102831],[47.9436107,0.210139],[47.9449898,0.2095768],[47.9454687,0.2093815],[47.9464183,0.2089944],[47.9467803,0.2088489],[47.946806,0.2088368],[47.9468302,0.2088248],[47.94685,0.2088144],[47.9468694,0.2088032],[47.9468824,0.2087944],[47.9468931,0.2087862],[47.9469038,0.2087775],[47.9469153,0.2087672],[47.9469274,0.2087554],[47.9469373,0.2087453],[47.9469472,0.2087352],[47.9469547,0.208727],[47.9469631,0.2087168],[47.9469714,0.2087059],[47.9469792,0.2086948],[47.9469871,0.2086825],[47.9469949,0.2086701],[47.9469999,0.2086615],[47.9470049,0.2086524],[47.9470097,0.208643],[47.9470136,0.208635],[47.9470177,0.208626],[47.9470222,0.2086142],[47.9470272,0.208599],[47.9470329,0.2085811],[47.947039,0.2085603],[47.9470416,0.2085499],[47.9470774,0.2084195],[47.9470824,0.2084023],[47.9470866,0.2083898],[47.9470919,0.2083751],[47.9470975,0.2083609],[47.9471034,0.2083473],[47.9471092,0.2083347],[47.9471156,0.2083218],[47.9471217,0.2083106],[47.9471276,0.2083003],[47.947135,0.2082871],[47.9471421,0.2082756],[47.947149,0.2082649],[47.9471576,0.2082533],[47.9471667,0.2082415],[47.9471769,0.2082289],[47.947188,0.208217],[47.9472007,0.208204],[47.947214,0.2081914],[47.9472281,0.20818],[47.947242,0.2081692],[47.9472539,0.2081605],[47.9472655,0.208153],[47.9472777,0.2081458],[47.9472898,0.2081395],[47.9473018,0.2081344],[47.9473132,0.2081299],[47.947332,0.2081232],[47.947357,0.2081143],[47.9473738,0.2081089],[47.9480082,0.2079323],[47.9480192,0.2079286],[47.9480283,0.2079247],[47.9480366,0.2079202],[47.9480452,0.2079149],[47.9480531,0.2079088],[47.9480612,0.2079015],[47.9480685,0.2078944],[47.9480767,0.2078857],[47.9480828,0.2078786],[47.9480899,0.2078705],[47.9480973,0.207861],[47.9481044,0.2078514],[47.9481099,0.2078435],[47.9481164,0.2078327],[47.948122,0.2078229],[47.948127,0.2078133],[47.9481322,0.2078016],[47.9481369,0.2077895],[47.9481409,0.2077785],[47.9481445,0.2077674],[47.9481468,0.2077592],[47.94815,0.2077462],[47.9481699,0.2076311],[47.9481744,0.2076084],[47.9481776,0.2075943],[47.948181,0.2075811],[47.9481845,0.2075699],[47.9481886,0.2075582],[47.9481934,0.2075467],[47.9481993,0.2075355],[47.9482064,0.2075229],[47.9482139,0.2075115],[47.9482228,0.2074997],[47.9482318,0.2074896],[47.9482404,0.2074821],[47.9482489,0.2074754],[47.9482589,0.2074689],[47.9482685,0.207464],[47.9482775,0.2074612],[47.9482863,0.2074595],[47.9482941,0.2074586],[47.9483033,0.2074582],[47.9483686,0.2074591],[47.9484811,0.2074677],[47.9486604,0.2074825],[47.9488452,0.2074958],[47.9493358,0.2075171],[47.9498718,0.2075404],[47.9503976,0.2075631],[47.9511663,0.2076063],[47.9526555,0.2076815]];
+
+// SVG → GPS (IDW) for event markers
+const _GCP = [
+  [418.0,916.6,47.95609,0.20762],[348.0,891.7,47.95580,0.20590],
+  [276.2,932.4,47.95717,0.20382],[226.4,909.2,47.95650,0.20290],
+  [130.0,840.0,47.95380,0.20060],[45.9,768.6,47.94925,0.20068],
+  [38.0,665.0,47.94580,0.20220],[200.0,580.0,47.94050,0.20680],
+  [400.0,500.0,47.93250,0.21220],[650.0,280.0,47.91600,0.22000],
+  [828.0,183.0,47.90600,0.22400],[1234.0,21.0,47.89430,0.22820],
+  [1321.4,21.8,47.89430,0.22820],[1223.7,457.9,47.90230,0.22710],
+  [1196.1,452.8,47.90300,0.22500],[1155.0,525.0,47.90880,0.21750],
+  [853.7,775.0,47.93950,0.21480],[738.0,820.0,47.94150,0.21300],
+  [638.0,817.0,47.94320,0.21200],[505.6,881.6,47.95050,0.20900],
+];
+function svgToGPS(x, y) {
+  let tw=0, latS=0, lonS=0;
+  for(const p of _GCP) {
+    const d = Math.sqrt((x-p[0])**2 + (y-p[1])**2);
+    if(d < 0.1) return [p[2], p[3]];
+    const w = 1 / (d ** 2.5);
+    tw += w; latS += w*p[2]; lonS += w*p[3];
+  }
+  return [latS/tw, lonS/tw];
+}
+
+
+const EVENT_GPS = {
+  // Départ/Arrivée (47.955, 0.208 area - start/finish straight)
+  premiere1923:[47.95,0.182], bentley1924:[47.95,0.187],
+  departLM:[47.9504,0.2078], rosier1950:[47.948,0.182],
+  catastrophe1955:[47.9488,0.2079], memorial1955:[47.9472,0.208],
+  ferrari60_65:[47.946,0.187], ford1966:[47.944,0.187],
+  mai68:[47.95,0.192], ickx1969:[47.952,0.2077],
+  rondeau1980:[47.942,0.187], mazda1991:[47.94,0.187],
+  audi2006:[47.938,0.187], recordDist2010:[47.942,0.182],
+  leenaGade:[47.946,0.192], hulk2015:[47.936,0.187],
+  toyota2018:[47.934,0.187], ferrari2023:[47.932,0.187],
+  ferrari2024:[47.93,0.187], kubica2025:[47.928,0.187],
+  newman1979:[47.948,0.192], recordKobayashi:[47.94,0.182],
+  levegh1952:[47.946,0.182], jaguar1953:[47.948,0.187],
+  monument:[47.934,0.192], classic:[47.942,0.192],
+  parade:[47.932,0.192], musee:[47.95,0.197],
+  record1971:[47.944,0.182],
+  // Courbe Dunlop / Chicane Dunlop (47.956, 0.211 area)
+  passerelle:[47.9565,0.21090], bugatti:[47.9572,0.21107],
+  chapelle:[47.9590,0.21440],
+  // Esses de la Forêt (47.959, 0.216 area)  
+  esses:[47.9593,0.21604],
+  // Tertre Rouge (47.961, 0.222 area)
+  tertreRouge:[47.9612,0.21950], simonsen2013:[47.9615,0.22050],
+  mcqueen1970:[47.9618,0.22150], mercedesCLR:[47.9610,0.22250],
+  // Hunaudières straight (47.96→47.93, going SE)
+  hunaudieres:[47.9450,0.23250], chicanes1990:[47.9500,0.23050],
+  wright:[47.9400,0.23500], record405:[47.9350,0.23700],
+  gartner1986:[47.9380,0.23600], gurney1967:[47.9300,0.23900],
+  enjolras1997:[47.9200,0.24100], toyota2016:[47.9250,0.24000],
+  record1971:[47.9280,0.23950], levegh1952:[47.9320,0.23800],
+  crash1927:[47.9420,0.23400],
+  // Mulsanne hairpin (47.889, 0.224 area)
+  mulsanneCorner:[47.9135,0.24310],
+  // Indianapolis (47.903, 0.219 area)
+  indianapolis:[47.9194,0.22300], audi2011:[47.9188,0.22350],
+  toyota2012:[47.9200,0.22250],
+  // Arnage (47.921, 0.215 area)
+  arnage:[47.9215,0.21548],
+  // Porsche curves (47.933, 0.209 area)
+  porsche1972:[47.9332,0.20950], matra1972:[47.9340,0.20980],
+  // Ford chicane (47.944, 0.209 area)
+  fordchicane:[47.9445,0.20958], karting:[47.9390,0.20976],
+  // Bugatti circuit / Moto events (47.957, 0.212 area)
+  gpe1:[47.95,0.172], gpe2:[47.948,0.172],
+  gpe3:[47.946,0.172], motoGP1969:[47.95,0.177],
+  '24hMotos1978':[47.948,0.177], puig1995:[47.946,0.177],
+  rossi2008:[47.944,0.177], rossiLM2012:[47.942,0.177],
+  bagnaia2023:[47.94,0.177], zarco2025:[47.938,0.177],
+  f1unique:[47.9585,0.21360],
+  // Misc events near circuit
+  delhalle:[47.95,0.197], meulebleue:[47.944,0.192],
+  camions:[47.94,0.192], roller:[47.938,0.192],
+  velo:[47.936,0.192],
+};
+
+// Detect mobile for responsive column layout
+const IS_MOBILE = window.innerWidth <= 768;
+
+// On mobile, expand the "no location" columns to avoid overlap at low zoom
+// Columns originally span lon 0.172-0.197 (~2.5km) and lat 47.928-47.950 (~2.4km)
+// On mobile, we multiply the deltas to ~3x for better readability
+if (IS_MOBILE) {
+  const COL_CENTER_LAT = 47.940;
+  const COL_CENTER_LON = 0.170; // shifted left to avoid overlapping circuit
+  const SCALE = 2.5;
+  Object.keys(EVENT_GPS).forEach(id => {
+    const [lat, lon] = EVENT_GPS[id];
+    if (lon < 0.201) {
+      const newLat = COL_CENTER_LAT + (lat - COL_CENTER_LAT) * SCALE;
+      const newLon = COL_CENTER_LON + (lon - 0.1845) * SCALE;
+      EVENT_GPS[id] = [newLat, newLon];
+    }
+  });
+}
+
+function initMainMap() {
+  if (satMap) return;
+  if (typeof L === 'undefined') { setTimeout(initMainMap, 200); return; }
+  satMap = L.map('sat-map', {
+    center: [47.935, 0.218],
+    zoom: 13,
+    zoomControl: false,
+    attributionControl: true,
+  });
+  // Dark background (default)
+  // Fond de carte ouvert : tuiles OpenStreetMap (ODbL, sans cle d'API),
+  // assombries via un filtre CSS pour conserver l'ambiance nocturne du site.
+  darkTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19, className: 'osm-dark',
+  }).addTo(satMap);
+  // IGN Orthophotos (added on toggle)
+  satTileLayer = L.tileLayer('https://data.geopf.fr/wmts?'+
+    'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM'+
+    '&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg'+
+    '&TILECOL={x}&TILEROW={y}&TILEMATRIX={z}', {
+    attribution: '\u00a9 IGN/G\u00e9oplateforme', maxZoom: 19,
+  });
+  // Zoom controls bottom right
+  L.control.zoom({position:'bottomright'}).addTo(satMap);
+  // Circuit trace (golden glow + line)
+  L.polyline(CIRCUIT_GPS_FULL, {color:'#c8a94e',weight:12,opacity:0.1,lineCap:'round'}).addTo(satMap);
+  L.polyline(CIRCUIT_GPS_FULL, {color:'#c8a94e',weight:4,opacity:0.7,lineCap:'round',lineJoin:'round'}).addTo(satMap);
+  // Dashed center line
+  L.polyline(CIRCUIT_GPS_FULL, {color:'rgba(200,169,78,0.3)',weight:1,dashArray:'6,10',lineCap:'round'}).addTo(satMap);
+  // Background panel behind the left columns (adapts to view mode and mobile)
+  // Default panel bounds, scaled up on mobile
+  const COL_CENTER_LAT = 47.940;
+  const COL_CENTER_LON_ORIG = 0.1845;
+  const COL_CENTER_LON_OUT = IS_MOBILE ? 0.170 : 0.1845;
+  const SCALE = IS_MOBILE ? 2.5 : 1;
+  function scalePt(lat, lon) {
+    return [COL_CENTER_LAT + (lat - COL_CENTER_LAT) * SCALE,
+            COL_CENTER_LON_OUT + (lon - COL_CENTER_LON_ORIG) * SCALE];
+  }
+  const panelBounds = [scalePt(47.924, 0.168), scalePt(47.956, 0.201)];
+  window._leftPanelBg = L.rectangle(panelBounds, {
+    color: 'rgba(200,169,78,0.3)',
+    weight: 1,
+    fillColor: '#ffffff',
+    fillOpacity: 0.08,
+    interactive: false,
+  }).addTo(satMap);
+  // "Events without location" title at top of panel
+  L.marker(scalePt(47.9555, 0.1845), {
+    icon: L.divIcon({
+      className:'panel-title',
+      html:'<div style="font-family:Oswald,sans-serif;font-size:' + (IS_MOBILE ? '14' : '12') + 'px;font-weight:700;letter-spacing:0.15em;color:#c8a94e;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.8);white-space:nowrap;text-align:center;pointer-events:none">Événements sans localisation</div>',
+      iconSize:[320,18], iconAnchor:[160,9],
+    }),
+    interactive: false,
+  }).addTo(satMap);
+  // Column labels on the left (category headers)
+  const RAW_COLUMN_LABELS = [
+    {lat:47.9530, lon:0.172, text:'GP EXPLORER', color:'#d850a0'},
+    {lat:47.9530, lon:0.177, text:'MOTO', color:'#40c8d8'},
+    {lat:47.9530, lon:0.182, text:'RECORDS', color:'#c8a94e'},
+    {lat:47.9530, lon:0.187, text:'VICTOIRES', color:'#50b860'},
+    {lat:47.9530, lon:0.192, text:'INSOLITE', color:'#80c850'},
+    {lat:47.9530, lon:0.197, text:'MÉMORIAL', color:'#9b6fc0'},
+  ];
+  const COLUMN_LABELS = RAW_COLUMN_LABELS.map(l => { const [lat,lon]=scalePt(l.lat,l.lon); return {lat,lon,text:l.text,color:l.color}; });
+  COLUMN_LABELS.forEach(l => {
+    L.marker([l.lat, l.lon], {
+      icon: L.divIcon({
+        className:'col-label',
+        html:`<div style="font-family:Oswald,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.1em;color:${l.color};text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,0.9),0 0 6px rgba(0,0,0,0.7);white-space:nowrap;pointer-events:none;text-align:center">${l.text}</div>`,
+        iconSize:[80,16], iconAnchor:[40,8],
+      }),
+      interactive: false,
+    }).addTo(satMap);
+  });
+  // Event markers
+  EVENTS.forEach(ev => {
+    const gps = EVENT_GPS[ev.id]; if(!gps) return;
+    const [lat,lng] = gps;
+    const m = L.circleMarker([lat,lng], {
+      radius:7, fillColor:ev.color, fillOpacity:0.9, color:'#0a0c10', weight:1.5,
+    }).addTo(satMap);
+    // Hover tooltip with just the title
+    m.bindTooltip(ev.title, {
+      direction: 'top',
+      offset: [0, -8],
+      className: 'ev-tooltip',
+      opacity: 1,
+    });
+    m.on('click', function(e) { L.DomEvent.stopPropagation(e); showPanel(ev); });
+    m._evCat = ev.category;
+    m._evId = ev.id;
+    m._evColor = ev.color;
+    satMarkers.push(m);
+  });
+  // Fit bounds to include both circuit AND (scaled) left columns
+  const fullBounds = L.latLngBounds(CIRCUIT_GPS_FULL)
+    .extend(scalePt(47.923, 0.167))
+    .extend(scalePt(47.957, 0.167))
+    .extend(scalePt(47.957, 0.201))
+    .extend(scalePt(47.923, 0.201));
+  satMap.fitBounds(fullBounds, {padding:[20,20]});
+  // Close panel on map click (not on marker click)
+  satMap.on('click', function() { closePanel(); });
+}
+// Init map on load
+initMainMap();
+
+// Deep linking: open event from URL hash (#ev=id)
+function openFromHash() {
+  const h = window.location.hash;
+  const m = h.match(/#ev=([a-zA-Z0-9_]+)/);
+  if (m) {
+    const ev = EVENTS.find(e => e.id === m[1]);
+    if (ev) {
+      setTimeout(() => showPanel(ev), 300);
+      return true;
+    }
+  }
+  return false;
+}
+openFromHash();
+window.addEventListener('hashchange', () => {
+  if (!openFromHash()) closePanel();
+});
+
+let searchQuery = '';
+function matchesSearch(ev) {
+  if (!searchQuery) return true;
+  const q = searchQuery.toLowerCase();
+  return (ev.title || '').toLowerCase().includes(q)
+      || (ev.body || '').toLowerCase().includes(q);
+}
+
+function filterSatMarkers() {
+  if (!satMap) return;
+  satMarkers.forEach(m => {
+    const ev = EVENTS.find(e => e.id === m._evId);
+    const catOk = activeFilter === 'all' || m._evCat === activeFilter;
+    const searchOk = !ev || matchesSearch(ev);
+    if (catOk && searchOk) {
+      if (!satMap.hasLayer(m)) satMap.addLayer(m);
+    } else { satMap.removeLayer(m); }
+  });
+}
+
+// Timeline: horizontal chronological frise (each event is ~36px apart for clarity)
+(function buildTimeline(){
+  const tl = document.getElementById('timeline');
+  if (!tl) return;
+  tl.innerHTML = '';
+  const inner = document.createElement('div');
+  inner.id = 'timeline-inner';
+  const line = document.createElement('div');
+  line.id = 'timeline-line';
+  inner.appendChild(line);
+
+  // Use year-based positioning with min spacing
+  const EVENT_SPACING = 36; // px minimum between events
+  // Group events by year to handle same-year events
+  const byYear = {};
+  EVENTS_SORTED.forEach(ev => {
+    const y = extractYear(ev);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(ev);
+  });
+  const years = Object.keys(byYear).map(Number).sort((a,b) => a-b);
+
+  let x = 0;
+  years.forEach(year => {
+    const events = byYear[year];
+    events.forEach((ev, idxInYear) => {
+      const item = document.createElement('div');
+      item.className = 'tl-item';
+      item.style.background = ev.color;
+      item.style.left = x + 'px';
+      item.dataset.id = ev.id;
+      item.dataset.cat = ev.category;
+      // Year label only on first event of the year
+      if (idxInYear === 0 && year < 9000) {
+        const y = document.createElement('span');
+        y.className = 'tl-year';
+        y.textContent = year;
+        item.appendChild(y);
+      }
+      const tip = document.createElement('span');
+      tip.className = 'tl-tooltip';
+      tip.textContent = ev.title;
+      item.appendChild(tip);
+      item.addEventListener('click', e => { e.stopPropagation(); showPanel(ev); });
+      inner.appendChild(item);
+      x += EVENT_SPACING;
+    });
+  });
+
+  // Set inner width so the scroll works
+  inner.style.width = (x + 40) + 'px';
+  tl.appendChild(inner);
+
+  // Scroll arrows
+  const leftBtn = document.getElementById('tl-scroll-left');
+  const rightBtn = document.getElementById('tl-scroll-right');
+  let scrollInterval = null;
+  function startScroll(dir) {
+    stopScroll();
+    scrollInterval = setInterval(() => { tl.scrollLeft += dir * 15; }, 16);
+  }
+  function stopScroll() { if (scrollInterval) { clearInterval(scrollInterval); scrollInterval = null; } }
+  if (leftBtn) {
+    leftBtn.addEventListener('click', () => tl.scrollBy({left: -400, behavior: 'smooth'}));
+    leftBtn.addEventListener('mouseenter', () => startScroll(-1));
+    leftBtn.addEventListener('mouseleave', stopScroll);
+  }
+  if (rightBtn) {
+    rightBtn.addEventListener('click', () => tl.scrollBy({left: 400, behavior: 'smooth'}));
+    rightBtn.addEventListener('mouseenter', () => startScroll(1));
+    rightBtn.addEventListener('mouseleave', stopScroll);
+  }
+})();
+
+function updateTimelineHighlight() {
+  let activeEl = null;
+  document.querySelectorAll('.tl-item').forEach(it => {
+    const isActive = it.dataset.id === currentSelectedId;
+    it.classList.toggle('active', isActive);
+    if (isActive) activeEl = it;
+    const catDimmed = activeFilter !== 'all' && it.dataset.cat !== activeFilter;
+    const searchDimmed = searchQuery && !matchesSearch(EVENTS.find(e => e.id === it.dataset.id));
+    it.classList.toggle('dimmed', catDimmed || searchDimmed);
+  });
+  // Scroll timeline to center the active event
+  if (activeEl) {
+    const tl = document.getElementById('timeline');
+    const elLeft = parseFloat(activeEl.style.left || 0);
+    tl.scrollTo({left: elLeft - tl.clientWidth / 2, behavior: 'smooth'});
+  }
+}
+
+// Search input handler
+(function initSearch(){
+  const input = document.getElementById('search-input');
+  const box = document.getElementById('search-box');
+  const clear = document.getElementById('search-clear');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    searchQuery = input.value.trim();
+    box.classList.toggle('has-value', !!searchQuery);
+    filterSatMarkers();
+    updateTimelineHighlight();
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { input.value=''; searchQuery=''; box.classList.remove('has-value'); filterSatMarkers(); updateTimelineHighlight(); input.blur(); }
+  });
+  clear.addEventListener('click', () => { input.value=''; searchQuery=''; box.classList.remove('has-value'); filterSatMarkers(); updateTimelineHighlight(); input.focus(); });
+})();
+
+function toggleSat() {
+  satActive = !satActive;
+  const btn = document.getElementById('btn-sat');
+  btn.classList.toggle('active', satActive);
+  btn.textContent = satActive ? '✕ Fermer satellite' : 'Vue satellite';
+  if (satActive) {
+    satMap.removeLayer(darkTileLayer);
+    satTileLayer.addTo(satMap);
+    // Switch panel background to black for contrast on satellite
+    if (window._leftPanelBg) window._leftPanelBg.setStyle({fillColor:'#000000', fillOpacity:0.55});
+  } else {
+    satMap.removeLayer(satTileLayer);
+    darkTileLayer.addTo(satMap);
+    // Back to white on dark background
+    if (window._leftPanelBg) window._leftPanelBg.setStyle({fillColor:'#ffffff', fillOpacity:0.08});
+  }
+}
+
+window.onerror = function(msg, src, line, col, err) {
+  console.error('Global error:', msg, 'line:', line, err);
+};
+
+</script>
+</body>
+</html>

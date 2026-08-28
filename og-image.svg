@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0c10"/>
+      <stop offset="100%" stop-color="#1a1812"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c8a94e"/>
+      <stop offset="50%" stop-color="#f4e09c"/>
+      <stop offset="100%" stop-color="#c8a94e"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Stylized circuit outline -->
+  <g transform="translate(820, 120)" opacity="0.4">
+    <path d="M 40 20 C 20 20 5 50 15 90 C 25 130 15 180 45 210 C 80 240 140 220 180 180 C 230 130 260 60 220 30 C 180 0 80 10 40 20 Z"
+          fill="none" stroke="url(#gold)" stroke-width="6" stroke-linejoin="round" filter="url(#glow)"/>
+    <path d="M 40 20 C 20 20 5 50 15 90 C 25 130 15 180 45 210 C 80 240 140 220 180 180 C 230 130 260 60 220 30 C 180 0 80 10 40 20 Z"
+          fill="none" stroke="url(#gold)" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="60" cy="70" r="6" fill="#e85040"/>
+    <circle cx="120" cy="40" r="6" fill="#50b860"/>
+    <circle cx="180" cy="100" r="6" fill="#c8a94e"/>
+    <circle cx="160" cy="170" r="6" fill="#4a9fd4"/>
+    <circle cx="80" cy="190" r="6" fill="#d850a0"/>
+  </g>
+  <!-- Title -->
+  <text x="80" y="260" font-family="Oswald, sans-serif" font-size="84" font-weight="700"
+        fill="url(#gold)" letter-spacing="4">CIRCUIT DE LA SARTHE</text>
+  <!-- Subtitle -->
+  <text x="80" y="320" font-family="Oswald, sans-serif" font-size="34" font-weight="400"
+        fill="#8a857a" letter-spacing="2">LES 24 HEURES DU MANS</text>
+  <!-- Description -->
+  <text x="80" y="430" font-family="Source Sans 3, sans-serif" font-size="28" fill="#b0ab9f">Carte historique interactive — 71 événements</text>
+  <text x="80" y="470" font-family="Source Sans 3, sans-serif" font-size="24" fill="#6a6560">1923–2025 · Vue 2D, 3D immersive et satellite IGN</text>
+  <!-- Decorative line -->
+  <line x1="80" y1="360" x2="480" y2="360" stroke="url(#gold)" stroke-width="2"/>
+  <!-- Stats -->
+  <g transform="translate(80, 540)">
+    <text font-family="Oswald, sans-serif" font-size="18" fill="#c8a94e" letter-spacing="1">
+      <tspan>13,626 KM</tspan>
+      <tspan dx="40" fill="#6a6560">·</tspan>
+      <tspan dx="40">38 VIRAGES</tspan>
+      <tspan dx="40" fill="#6a6560">·</tspan>
+      <tspan dx="40">100+ ANS D'HISTOIRE</tspan>
+    </text>
+  </g>
+</svg>
