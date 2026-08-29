@@ -31,10 +31,14 @@ body{background:#0a0c10;color:#e8e4dc;font-family:'Source Sans 3',sans-serif}
 #app{display:flex;height:100vh;position:relative}
 #map-area{flex:1;position:relative;overflow:hidden;cursor:grab}
 #map-area.dragging{cursor:grabbing}
-#sat-map{position:absolute;inset:0;z-index:2;background:#0a0c10}
-/* Rendu sombre du fond OpenStreetMap (le calque satellite IGN n'est pas affecte) */
-#sat-map .osm-dark{filter:grayscale(1) invert(1) brightness(0.55) contrast(1.25)}
-#sat-map .leaflet-control-attribution a{color:#c8a94e}
+#sat-map{position:absolute;inset:0;z-index:2;background:#eef0f2}
+/* Rendu clair et epure du fond OpenStreetMap (le calque satellite IGN n'est pas affecte) */
+#sat-map .osm-light{filter:grayscale(1) brightness(1.14) contrast(0.72)}
+/* Halo des libelles poses sur la carte : clair sur le fond clair, sombre sur la vue satellite */
+#sat-map .panel-title div,#sat-map .col-label div{text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.9) !important}
+#sat-map.sat-on .panel-title div,#sat-map.sat-on .col-label div{text-shadow:0 1px 3px rgba(0,0,0,0.95),0 0 8px rgba(0,0,0,0.85) !important;filter:brightness(1.6) saturate(1.05)}
+#sat-map .leaflet-control-attribution{background:rgba(255,255,255,0.7)}
+#sat-map .leaflet-control-attribution a{color:#5a4a1e}
 
 #sat-map .leaflet-control-attribution{font-size:8px;opacity:0.5;margin-bottom:110px !important}
 #sat-map .leaflet-bottom.leaflet-right{bottom:120px}
@@ -48,9 +52,9 @@ body{background:#0a0c10;color:#e8e4dc;font-family:'Source Sans 3',sans-serif}
 #btn-sat{position:fixed;top:16px;right:160px;z-index:9998;padding:8px 16px;border-radius:20px;border:1px solid rgba(200,169,78,0.3);background:rgba(10,12,16,0.85);color:#c8a94e;cursor:pointer;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;transition:all 0.3s;backdrop-filter:blur(8px)}
 #btn-sat:hover,#btn-sat.active{background:rgba(200,169,78,0.2);border-color:#c8a94e;box-shadow:0 0 12px rgba(200,169,78,0.15)}
 
-#title-bar{position:absolute;top:0;left:0;right:0;padding:18px 28px;background:linear-gradient(180deg,rgba(10,12,16,0.92) 0%,rgba(10,12,16,0.6) 70%,transparent 100%);z-index:10;pointer-events:none}
-#title-bar h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(18px,2.5vw,32px);letter-spacing:0.12em;text-transform:uppercase;background:linear-gradient(90deg,#c8a94e,#f4e09c,#c8a94e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-#title-bar .sub{font-size:clamp(11px,1.2vw,15px);color:#8a857a;letter-spacing:0.05em;margin-top:2px}
+#title-bar{position:absolute;top:0;left:0;right:0;padding:18px 28px;background:linear-gradient(180deg,rgba(247,248,249,0.96) 0%,rgba(247,248,249,0.72) 62%,transparent 100%);z-index:10;pointer-events:none}
+#title-bar h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(18px,2.5vw,32px);letter-spacing:0.12em;text-transform:uppercase;background:linear-gradient(90deg,#8a6a1e,#b9922f,#8a6a1e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#title-bar .sub{font-size:clamp(11px,1.2vw,15px);color:#5f5a52;letter-spacing:0.05em;margin-top:2px}
 
 
 #search-box{position:absolute;top:100px;left:20px;z-index:11;display:flex;align-items:center;gap:8px;background:rgba(10,12,16,0.9);border:1px solid rgba(200,169,78,0.3);border-radius:22px;padding:8px 14px;backdrop-filter:blur(8px);width:300px;max-width:calc(100vw - 40px);transition:border-color 0.2s,box-shadow 0.2s}
@@ -1798,10 +1802,10 @@ function initMainMap() {
   });
   // Dark background (default)
   // Fond de carte ouvert : tuiles OpenStreetMap (ODbL, sans cle d'API),
-  // assombries via un filtre CSS pour conserver l'ambiance nocturne du site.
+  // eclaircies et desaturees via un filtre CSS pour un rendu clair et epure.
   darkTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19, className: 'osm-dark',
+    maxZoom: 19, className: 'osm-light',
   }).addTo(satMap);
   // IGN Orthophotos (added on toggle)
   satTileLayer = L.tileLayer('https://data.geopf.fr/wmts?'+
@@ -1812,11 +1816,11 @@ function initMainMap() {
   });
   // Zoom controls bottom right
   L.control.zoom({position:'bottomright'}).addTo(satMap);
-  // Circuit trace (golden glow + line)
-  L.polyline(CIRCUIT_GPS_FULL, {color:'#c8a94e',weight:12,opacity:0.1,lineCap:'round'}).addTo(satMap);
-  L.polyline(CIRCUIT_GPS_FULL, {color:'#c8a94e',weight:4,opacity:0.7,lineCap:'round',lineJoin:'round'}).addTo(satMap);
+  // Circuit trace (liseré sombre + ligne dorée)
+  L.polyline(CIRCUIT_GPS_FULL, {color:'#2a2e38',weight:9,opacity:0.22,lineCap:'round',lineJoin:'round'}).addTo(satMap);
+  L.polyline(CIRCUIT_GPS_FULL, {color:'#a8862f',weight:4,opacity:0.95,lineCap:'round',lineJoin:'round'}).addTo(satMap);
   // Dashed center line
-  L.polyline(CIRCUIT_GPS_FULL, {color:'rgba(200,169,78,0.3)',weight:1,dashArray:'6,10',lineCap:'round'}).addTo(satMap);
+  L.polyline(CIRCUIT_GPS_FULL, {color:'rgba(255,255,255,0.55)',weight:1,dashArray:'6,10',lineCap:'round'}).addTo(satMap);
   // Background panel behind the left columns (adapts to view mode and mobile)
   // Default panel bounds, scaled up on mobile
   const COL_CENTER_LAT = 47.940;
@@ -1829,36 +1833,36 @@ function initMainMap() {
   }
   const panelBounds = [scalePt(47.924, 0.168), scalePt(47.956, 0.201)];
   window._leftPanelBg = L.rectangle(panelBounds, {
-    color: 'rgba(200,169,78,0.3)',
+    color: 'rgba(90,80,50,0.35)',
     weight: 1,
     fillColor: '#ffffff',
-    fillOpacity: 0.08,
+    fillOpacity: 0.72,
     interactive: false,
   }).addTo(satMap);
   // "Events without location" title at top of panel
   L.marker(scalePt(47.9555, 0.1845), {
     icon: L.divIcon({
       className:'panel-title',
-      html:'<div style="font-family:Oswald,sans-serif;font-size:' + (IS_MOBILE ? '14' : '12') + 'px;font-weight:700;letter-spacing:0.15em;color:#c8a94e;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.8);white-space:nowrap;text-align:center;pointer-events:none">Événements sans localisation</div>',
+      html:'<div style="font-family:Oswald,sans-serif;font-size:' + (IS_MOBILE ? '14' : '12') + 'px;font-weight:700;letter-spacing:0.15em;color:#7d6220;text-transform:uppercase;text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.9);white-space:nowrap;text-align:center;pointer-events:none">Événements sans localisation</div>',
       iconSize:[320,18], iconAnchor:[160,9],
     }),
     interactive: false,
   }).addTo(satMap);
   // Column labels on the left (category headers)
   const RAW_COLUMN_LABELS = [
-    {lat:47.9530, lon:0.172, text:'GP EXPLORER', color:'#d850a0'},
-    {lat:47.9530, lon:0.177, text:'MOTO', color:'#40c8d8'},
-    {lat:47.9530, lon:0.182, text:'RECORDS', color:'#c8a94e'},
-    {lat:47.9530, lon:0.187, text:'VICTOIRES', color:'#50b860'},
-    {lat:47.9530, lon:0.192, text:'INSOLITE', color:'#80c850'},
-    {lat:47.9530, lon:0.197, text:'MÉMORIAL', color:'#9b6fc0'},
+    {lat:47.9530, lon:0.172, text:'GP EXPLORER', color:'#b02e78'},
+    {lat:47.9530, lon:0.177, text:'MOTO', color:'#1f8b99'},
+    {lat:47.9530, lon:0.182, text:'RECORDS', color:'#8a6a1e'},
+    {lat:47.9530, lon:0.187, text:'VICTOIRES', color:'#2e8540'},
+    {lat:47.9530, lon:0.192, text:'INSOLITE', color:'#4e8f2a'},
+    {lat:47.9530, lon:0.197, text:'MÉMORIAL', color:'#6f479b'},
   ];
   const COLUMN_LABELS = RAW_COLUMN_LABELS.map(l => { const [lat,lon]=scalePt(l.lat,l.lon); return {lat,lon,text:l.text,color:l.color}; });
   COLUMN_LABELS.forEach(l => {
     L.marker([l.lat, l.lon], {
       icon: L.divIcon({
         className:'col-label',
-        html:`<div style="font-family:Oswald,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.1em;color:${l.color};text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,0.9),0 0 6px rgba(0,0,0,0.7);white-space:nowrap;pointer-events:none;text-align:center">${l.text}</div>`,
+        html:`<div style="font-family:Oswald,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.1em;color:${l.color};text-transform:uppercase;text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 6px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none;text-align:center">${l.text}</div>`,
         iconSize:[80,16], iconAnchor:[40,8],
       }),
       interactive: false,
@@ -2050,6 +2054,8 @@ function toggleSat() {
   const btn = document.getElementById('btn-sat');
   btn.classList.toggle('active', satActive);
   btn.textContent = satActive ? '✕ Fermer satellite' : 'Vue satellite';
+  // Bascule le halo des libellés (clair sur fond clair, sombre sur satellite)
+  document.getElementById('sat-map').classList.toggle('sat-on', satActive);
   if (satActive) {
     satMap.removeLayer(darkTileLayer);
     satTileLayer.addTo(satMap);
@@ -2058,8 +2064,8 @@ function toggleSat() {
   } else {
     satMap.removeLayer(satTileLayer);
     darkTileLayer.addTo(satMap);
-    // Back to white on dark background
-    if (window._leftPanelBg) window._leftPanelBg.setStyle({fillColor:'#ffffff', fillOpacity:0.08});
+    // Back to a light card on the light basemap
+    if (window._leftPanelBg) window._leftPanelBg.setStyle({fillColor:'#ffffff', fillOpacity:0.72});
   }
 }
 
